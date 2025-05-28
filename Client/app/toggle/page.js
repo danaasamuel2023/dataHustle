@@ -45,7 +45,7 @@ export default function InventoryPage() {
       setError(null);
       
       const response = await axios.put(
-        `https://datamartbackened.onrender.com/api/inventory/${network}/toggle`, 
+        `https://datahustle.onrender.com/api/inventory/${network}/toggle`, 
         {}, // empty body
         getAuthHeaders() // pass the auth headers
       );

@@ -16,7 +16,7 @@ const getDashboardData = async (date) => {
     }
     
     // Replace with your actual API endpoint
-    const response = await fetch(`https://datamartbackened.onrender.com/api/daily-summary?date=${date}`, {
+    const response = await fetch(`https://datahustle.onrender.com/api/daily-summary?date=${date}`, {
       headers: {
         'x-auth-token': authToken
       }

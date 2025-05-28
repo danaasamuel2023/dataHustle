@@ -7,7 +7,7 @@ import { Loader2, ChevronRight, ChevronDown, Calendar, Phone, Database, CreditCa
 // API constants
 const GEONETTECH_BASE_URL = 'https://orders.geonettech.com/api/v1';
 const API_KEY = '21|rkrw7bcoGYjK8irAOTMaZ8sc1LRHYcwjuZnZmMNw4a6196f1';
-const API_BASE_URL = 'https://datamartbackened.onrender.com/api/v1';
+const API_BASE_URL = 'https://datahustle.onrender.com/api/v1';
 
 // Format currency as GHS
 const formatCurrency = (amount) => {

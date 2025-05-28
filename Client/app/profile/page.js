@@ -116,7 +116,7 @@ const UserStatsPage = () => {
       const userId = userData.id;
       
       // Using GET request with userId in URL params
-      const response = await axios.get(`https://datamartbackened.onrender.com/api/v1/user-stats/${userId}`, {
+      const response = await axios.get(`https://datahustle.onrender.com/api/v1/user-stats/${userId}`, {
         headers: {
           'Authorization': `Bearer ${authToken}`
         }

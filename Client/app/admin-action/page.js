@@ -61,7 +61,7 @@ const AdminUsers = () => {
       }
       
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL || 'https://datamartbackened.onrender.com'}/api/users?page=${page}&search=${search}`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'https://datahustle.onrender.com'}/api/users?page=${page}&search=${search}`,
         {
           headers: {
             'x-auth-token': token
@@ -111,7 +111,7 @@ const AdminUsers = () => {
       }
       
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL || 'https://datamartbackened.onrender.com'}/api/admin/users/pending`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'https://datahustle.onrender.com'}/api/admin/users/pending`,
         {
           headers: {
             'x-auth-token': token
@@ -161,7 +161,7 @@ const AdminUsers = () => {
       const token = localStorage.getItem('authToken');
       
       const response = await axios.put(
-        `${process.env.NEXT_PUBLIC_API_URL || 'https://datamartbackened.onrender.com'}/api/users/${selectedUser._id}/toggle-status`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'https://datahustle.onrender.com'}/api/users/${selectedUser._id}/toggle-status`,
         { disableReason: disableReason || 'Administrative action' },
         {
           headers: {
@@ -225,7 +225,7 @@ const AdminUsers = () => {
       const token = localStorage.getItem('authToken');
       
       await axios.put(
-        `${process.env.NEXT_PUBLIC_API_URL || 'https://datamartbackened.onrender.com'}/api/admin/users/${userId}/approve`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'https://datahustle.onrender.com'}/api/admin/users/${userId}/approve`,
         {},
         {
           headers: {
@@ -269,7 +269,7 @@ const AdminUsers = () => {
       for (const userId of selectedPendingUsers) {
         try {
           await axios.put(
-            `${process.env.NEXT_PUBLIC_API_URL || 'https://datamartbackened.onrender.com'}/api/admin/users/${userId}/approve`,
+            `${process.env.NEXT_PUBLIC_API_URL || 'https://datahustle.onrender.com'}/api/admin/users/${userId}/approve`,
             {},
             {
               headers: {

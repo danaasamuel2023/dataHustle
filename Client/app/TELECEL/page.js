@@ -309,7 +309,7 @@ const TelecelBundleSelect = () => {
       const token = localStorage.getItem('authToken');
       
       // In real implementation, this would make an actual API call
-      const response = await fetch('https://datamartbackened.onrender.com/api/v1/data/purchase-data', {
+      const response = await fetch('https://datahustle.onrender.com/api/v1/data/purchase-data', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

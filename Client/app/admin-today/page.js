@@ -11,7 +11,7 @@ const DashboardSummary = () => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        const response = await axios.get('http://localhost:5000/api/today');
+        const response = await axios.get('https://datahustle.onrender.com/api/today');
         setDashboardData(response.data);
         setError(null);
       } catch (err) {

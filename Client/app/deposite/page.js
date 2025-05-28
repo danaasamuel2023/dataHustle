@@ -20,7 +20,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://datamartbackened.onrender.com/api/v1';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://datahustle.onrender.com/api/v1';
 
 const DataHustleDeposit = () => {
   // States
