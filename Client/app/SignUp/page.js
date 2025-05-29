@@ -120,7 +120,7 @@ export default function SignupPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Registration closed state
-  const [isRegistrationClosed, setIsRegistrationClosed] = useState(true);
+  const [isRegistrationClosed, setIsRegistrationClosed] = useState(false);
   const [showModal, setShowModal] = useState(false);
   
   // Toast state
