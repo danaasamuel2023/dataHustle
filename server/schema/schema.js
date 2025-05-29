@@ -240,12 +240,12 @@ OrderReportSchema.index({ purchaseId: 1 });
 OrderReportSchema.index({ status: 1 });
 
 // Export all models
-const User = mongoose.model("User", UserSchema);
-const DataPurchase = mongoose.model("DataPurchase", DataPurchaseSchema);
-const Transaction = mongoose.model("Transaction", TransactionSchema);
-const ReferralBonus = mongoose.model("ReferralBonus", ReferralBonusSchema);
-const ApiKey = mongoose.model('ApiKey', apiKeySchema);
-const DataInventory = mongoose.model("DataInventory", DataInventorySchema);
-const OrderReport = mongoose.model("OrderReport", OrderReportSchema);
+const User = mongoose.model("Userdatahustle", UserSchema);
+const DataPurchase = mongoose.model("DataPurchasedatahustle", DataPurchaseSchema);
+const Transaction = mongoose.model("Transactiondatahustle", TransactionSchema);
+const ReferralBonus = mongoose.model("ReferralBonusdatahustle", ReferralBonusSchema);
+const ApiKey = mongoose.model('ApiKeydatahusle', apiKeySchema);
+const DataInventory = mongoose.model("DataInventorydatahustle", DataInventorySchema);
+const OrderReport = mongoose.model("OrderReporthustle", OrderReportSchema);
 
 module.exports = { User, DataPurchase, Transaction, ReferralBonus, ApiKey, DataInventory, OrderReport };
