@@ -24,7 +24,7 @@ export const metadata = {
     google: "Ef-n9jMB8qrIion-ddD_qPQpqd1syAOgKmuvhaBu_2o",
   },
   openGraph: {
-    title: "DataMart | Ghana's Premier Data Marketplace",
+    title: " | Ghana's Premier Data Marketplace",
     description: "Connect with data resellers across Ghana. Buy and sell client data securely on our trusted platform.",
     url: "https://www.datahustle.shop",
     siteName: "DATAHUSTLE", 
