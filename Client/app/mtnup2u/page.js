@@ -42,7 +42,138 @@ const Toast = ({ message, type, onClose }) => {
   );
 };
 
-// Service Information Modal - Compact
+// Purchase Modal Component
+const PurchaseModal = ({ isOpen, onClose, bundle, phoneNumber, setPhoneNumber, onPurchase, error, isLoading }) => {
+  if (!isOpen || !bundle) return null;
+
+  const handlePhoneNumberChange = (e) => {
+    let formatted = e.target.value.replace(/\D/g, '');
+    
+    if (!formatted.startsWith('0') && formatted.length > 0) {
+      formatted = '0' + formatted;
+    }
+    
+    if (formatted.length > 10) {
+      formatted = formatted.substring(0, 10);
+    }
+    
+    setPhoneNumber(formatted);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onPurchase();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 w-full max-w-md shadow-xl">
+        {/* Modal header */}
+        <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 px-6 py-4 rounded-t-2xl flex justify-between items-center">
+          <h3 className="text-lg font-bold text-white flex items-center">
+            <Zap className="w-5 h-5 mr-2" />
+            Purchase {bundle.capacity}GB
+          </h3>
+          <button onClick={onClose} className="text-white hover:text-white/70 p-1 rounded-lg hover:bg-white/10 transition-all">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        
+        {/* Modal content */}
+        <div className="px-6 py-4">
+          {/* Bundle Info */}
+          <div className="bg-white/10 rounded-xl p-4 mb-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-white font-medium">Data Bundle:</span>
+              <span className="text-emerald-400 font-bold">{bundle.capacity}GB</span>
+            </div>
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-white font-medium">Duration:</span>
+              <span className="text-emerald-400 font-bold">No-Expiry</span>
+            </div>
+            <div className="flex justify-between items-center border-t border-white/20 pt-2">
+              <span className="text-white font-bold">Total Price:</span>
+              <span className="text-emerald-400 font-bold text-lg">₵{bundle.price}</span>
+            </div>
+          </div>
+
+          {/* Error Display */}
+          {error && (
+            <div className="mb-4 p-3 rounded-xl flex items-start bg-red-500/20 border border-red-500/30">
+              <X className="w-4 h-4 text-red-400 mr-2 mt-0.5 flex-shrink-0" />
+              <span className="text-red-200 text-sm">{error}</span>
+            </div>
+          )}
+
+          {/* Phone Number Form */}
+          <form onSubmit={handleSubmit}>
+            <div className="mb-4">
+              <label className="block text-sm font-bold mb-2 text-white">
+                Enter MTN Phone Number
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Phone className="w-4 h-4 text-emerald-400" />
+                </div>
+                <input
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={handlePhoneNumberChange}
+                  className="pl-10 pr-4 py-3 block w-full rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder-white/50 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-medium"
+                  placeholder="0XXXXXXXXX"
+                  required
+                  autoFocus
+                />
+              </div>
+              <p className="mt-1 text-xs text-white/70">Format: 0 followed by 9 digits</p>
+            </div>
+
+            {/* Warning */}
+            <div className="mb-4 p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-xl">
+              <div className="flex items-start">
+                <AlertTriangle className="w-4 h-4 text-yellow-400 mr-2 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-yellow-200 text-xs">
+                    <strong>Important:</strong> Verify your number carefully. No refunds for wrong numbers.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 py-3 px-4 bg-white/10 hover:bg-white/20 text-white font-medium rounded-xl transition-all border border-white/20"
+                disabled={isLoading}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading || !phoneNumber || phoneNumber.length !== 10}
+                className="flex-1 py-3 px-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold rounded-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="w-4 h-4 mr-2" />
+                    Purchase Now
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};
 const ServiceInfoModal = ({ isOpen, onClose, onConfirm }) => {
   if (!isOpen) return null;
   
@@ -141,6 +272,7 @@ const MTNBundleSelect = () => {
   const [error, setError] = useState('');
   const [userData, setUserData] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
   const [pendingPurchase, setPendingPurchase] = useState(null);
   
   // Toast state
@@ -257,24 +389,10 @@ const MTNBundleSelect = () => {
     return bundles.find(bundle => bundle.value === selectedBundle);
   };
 
-  const handlePurchase = async (e) => {
-    e.preventDefault();
-    setError('');
-    
-    if (!selectedBundle) {
-      setError('Please select a data bundle');
-      return;
-    }
-    
-    if (!validatePhoneNumber(phoneNumber)) {
-      setError('Please enter a valid MTN number');
-      return;
-    }
-
-    const bundle = getSelectedBundleDetails();
-    
+  // Handle bundle selection - opens purchase modal
+  const handleBundleSelect = (bundle) => {
     if (!bundle.inStock) {
-      setError('Sorry, this bundle is currently out of stock.');
+      showToast('This bundle is currently out of stock', 'error');
       return;
     }
 
@@ -283,15 +401,24 @@ const MTNBundleSelect = () => {
       return;
     }
 
+    setSelectedBundle(bundle.value);
     setPendingPurchase(bundle);
-    setIsModalOpen(true);
+    setPhoneNumber(''); // Reset phone number
+    setError(''); // Clear any previous errors
+    setIsPurchaseModalOpen(true);
   };
 
-  // Process the actual purchase after modal confirmation
+  // Process the actual purchase
   const processPurchase = async () => {
-    if (!pendingPurchase) return; 
+    if (!pendingPurchase) return;
+    
+    if (!validatePhoneNumber(phoneNumber)) {
+      setError('Please enter a valid MTN number (10 digits starting with 0)');
+      return;
+    }
     
     setIsLoading(true);
+    setError('');
 
     try {
       const token = localStorage.getItem('authToken');
@@ -308,18 +435,20 @@ const MTNBundleSelect = () => {
       });
 
       if (response.data.status === 'success') {
-        showToast(`${pendingPurchase.capacity}GB purchased successfully!`, 'success');
+        showToast(`${pendingPurchase.capacity}GB purchased successfully for ${phoneNumber}!`, 'success');
         setSelectedBundle('');
         setPhoneNumber('');
         setError('');
+        setIsPurchaseModalOpen(false);
+        setPendingPurchase(null);
       }
     } catch (error) {
       console.error('Purchase error:', error);
-      setError(error.response?.data?.message || 'Failed to purchase data bundle');
-      showToast(error.response?.data?.message || 'Purchase failed', 'error');
+      const errorMessage = error.response?.data?.message || 'Purchase failed. Please try again.';
+      setError(errorMessage);
+      showToast(errorMessage, 'error');
     } finally {
       setIsLoading(false);
-      setPendingPurchase(null);
     }
   };
 
@@ -350,8 +479,23 @@ const MTNBundleSelect = () => {
             onClose={() => setIsModalOpen(false)}
             onConfirm={() => {
               setIsModalOpen(false);
-              processPurchase();
             }}
+          />
+
+          <PurchaseModal
+            isOpen={isPurchaseModalOpen}
+            onClose={() => {
+              setIsPurchaseModalOpen(false);
+              setPendingPurchase(null);
+              setPhoneNumber('');
+              setError('');
+            }}
+            bundle={pendingPurchase}
+            phoneNumber={phoneNumber}
+            setPhoneNumber={setPhoneNumber}
+            onPurchase={processPurchase}
+            error={error}
+            isLoading={isLoading}
           />
           
           {/* Header - Compact */}
@@ -388,127 +532,61 @@ const MTNBundleSelect = () => {
               </div>
             </div>
 
-            {/* Form - Compact */}
+            {/* Form - Only Bundle Selection Grid */}
             <div className="p-6">
               {/* Service info button */}
-              <div className="mb-4 flex justify-center">
+              <div className="mb-6 flex justify-center">
                 <button
                   onClick={() => setIsModalOpen(true)}
-                  className="flex items-center space-x-2 px-3 py-2 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-medium rounded-lg hover:bg-emerald-500/30 transition-all text-sm"
+                  className="flex items-center space-x-2 px-4 py-2 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-medium rounded-lg hover:bg-emerald-500/30 transition-all text-sm"
                 >
                   <Info className="h-4 w-4" />
-                  <span>Service Info</span>
+                  <span>Service Information</span>
                 </button>
               </div>
 
-              {/* Error Display */}
-              {error && (
-                <div className="mb-4 p-3 rounded-xl flex items-start bg-red-500/20 border border-red-500/30">
-                  <X className="w-4 h-4 text-red-400 mr-2 mt-0.5 flex-shrink-0" />
-                  <span className="text-red-200 text-sm">{error}</span>
+              {/* Bundle Selection Grid */}
+              <div>
+                <label className="block text-lg font-bold mb-4 text-white text-center">
+                  Choose Your Data Bundle
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  {bundles.map((bundle) => (
+                    <button
+                      key={bundle.value}
+                      type="button"
+                      onClick={() => handleBundleSelect(bundle)}
+                      disabled={!bundle.inStock}
+                      className={`p-4 rounded-xl text-center transition-all border transform hover:scale-105 ${
+                        bundle.inStock
+                          ? 'bg-white/10 border-white/20 text-white/90 hover:bg-emerald-500/20 hover:border-emerald-400/50 cursor-pointer'
+                          : 'bg-gray-500/20 border-gray-500/30 text-gray-500 cursor-not-allowed opacity-50'
+                      }`}
+                    >
+                      <div className="text-sm font-bold mb-1">{bundle.label}</div>
+                      <div className="text-emerald-400 font-bold text-sm">₵{bundle.price}</div>
+                      {!bundle.inStock && (
+                        <div className="text-red-400 text-xs mt-1">Out of Stock</div>
+                      )}
+                      {bundle.inStock && (
+                        <div className="text-white/60 text-xs mt-1">Click to buy</div>
+                      )}
+                    </button>
+                  ))}
                 </div>
-              )}
-
-              <form onSubmit={handlePurchase} className="space-y-4">
-                {/* Bundle Selection Grid */}
-                <div>
-                  <label className="block text-sm font-bold mb-3 text-white">
-                    Select Data Bundle
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {bundles.map((bundle) => (
-                      <button
-                        key={bundle.value}
-                        type="button"
-                        onClick={() => setSelectedBundle(bundle.value)}
-                        disabled={!bundle.inStock}
-                        className={`p-3 rounded-xl text-center transition-all border ${
-                          selectedBundle === bundle.value
-                            ? 'bg-emerald-500/30 border-emerald-400 text-white'
-                            : bundle.inStock
-                              ? 'bg-white/10 border-white/20 text-white/80 hover:bg-white/20'
-                              : 'bg-gray-500/20 border-gray-500/30 text-gray-500 cursor-not-allowed'
-                        }`}
-                      >
-                        <div className="text-sm font-bold">{bundle.label}</div>
-                        <div className="text-xs text-emerald-400">₵{bundle.price}</div>
-                        {!bundle.inStock && (
-                          <div className="text-xs text-red-400 mt-1">Out of Stock</div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Phone Number Input */}
-                <div>
-                  <label className="block text-sm font-bold mb-3 text-white">
-                    MTN Phone Number
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Phone className="w-4 h-4 text-emerald-400" />
-                    </div>
-                    <input
-                      type="tel"
-                      value={phoneNumber}
-                      onChange={handlePhoneNumberChange}
-                      className="pl-10 pr-4 py-3 block w-full rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder-white/50 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-medium"
-                      placeholder="0XXXXXXXXX"
-                      required
-                    />
-                  </div>
-                  <p className="mt-1 text-xs text-white/70">Format: 0 + 9 digits</p>
-                </div>
-
-                {/* Order Summary */}
-                {selectedBundle && (
-                  <div className="p-4 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20">
-                    <h3 className="text-sm font-bold text-white mb-3 flex items-center">
-                      <CreditCard className="w-4 h-4 mr-2 text-emerald-400" />
-                      Order Summary
-                    </h3>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-white/90 text-sm">
-                        <span>Data:</span>
-                        <span className="font-medium">{getSelectedBundleDetails()?.capacity}GB</span>
-                      </div>
-                      <div className="flex justify-between text-white/90 text-sm">
-                        <span>Duration:</span>
-                        <span className="font-medium text-emerald-400">No-Expiry</span>
-                      </div>
-                      <div className="border-t border-white/20 pt-2 mt-2">
-                        <div className="flex justify-between text-white font-bold">
-                          <span>Total:</span>
-                          <span className="text-emerald-400">₵{getSelectedBundleDetails()?.price}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Purchase Button */}
-                <button
-                  type="submit"
-                  disabled={isLoading || !selectedBundle || !phoneNumber}
-                  className="w-full flex items-center justify-center py-3 px-4 rounded-xl text-white bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 focus:outline-none focus:ring-4 focus:ring-emerald-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 font-bold"
-                >
-                  <Zap className="mr-2 w-4 h-4" />
-                  Purchase Data
-                  <ArrowRight className="ml-2 w-4 h-4" />
-                </button>
-              </form>
+              </div>
 
               {/* Important Notice - Compact */}
-              <div className="mt-4 p-3 bg-red-500/20 border border-red-500/30 rounded-xl">
+              <div className="mt-6 p-4 bg-red-500/20 border border-red-500/30 rounded-xl">
                 <div className="flex items-start">
-                  <AlertTriangle className="w-4 h-4 text-red-400 mr-2 mt-0.5 flex-shrink-0" />
+                  <AlertTriangle className="w-4 h-4 text-red-400 mr-3 mt-0.5 flex-shrink-0" />
                   <div>
-                    <h4 className="text-sm font-bold text-red-400 mb-1">Important</h4>
+                    <h4 className="text-sm font-bold text-red-400 mb-2">Important Notice</h4>
                     <div className="space-y-1 text-white/80 text-xs">
+                      <p>• Not instant service - delivery takes time</p>
                       <p>• Turbonet & Broadband SIMs not eligible</p>
-                      <p>• Verify number carefully - no refunds</p>
-                      <p>• Data delivery may take time</p>
+                      <p>• No refunds for wrong numbers</p>
+                      <p>• For urgent data, use *138# instead</p>
                     </div>
                   </div>
                 </div>
