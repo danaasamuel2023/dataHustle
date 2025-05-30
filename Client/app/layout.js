@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "DataMart | Ghana's Premier Data Marketplace",
+  title: "DataHustle | Data Marketplace",
   description: "The leading platform for data resellers in Ghana to buy and sell client data securely and efficiently.",
   keywords: "data marketplace, Ghana, data resellers, buy data, sell data, client data, Ghana data market",
   verification: {
@@ -26,14 +26,14 @@ export const metadata = {
   openGraph: {
     title: "DataMart | Ghana's Premier Data Marketplace",
     description: "Connect with data resellers across Ghana. Buy and sell client data securely on our trusted platform.",
-    url: "https://www.datamartgh.shop",
-    siteName: "DataMart",
+    url: "https://www.datahustle.shop",
+    siteName: "DATAHUSTLE", 
     images: [
       {
         url: "/component/datamart-logo.svg",
         width: 1200,
         height: 630,
-        alt: "DataMart - Ghana's Data Marketplace",
+        alt: "DataHistle - Ghana's Data Marketplace",
       },
     ],
     locale: "en_GH",
@@ -41,18 +41,18 @@ export const metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "DataMart | Ghana's Premier Data Marketplace",
+    title: "DATA hustle | Ghana's Premier Data Marketplace",
     description: "Connect with data resellers across Ghana. Buy and sell client data securely on our trusted platform.",
     images: ["/images/datamart-twitter.jpg"],
   },
   alternates: {
-    canonical: "https://datamartgh.shop",
+    canonical: "https://www.datahustle.shop/",
   },
   robots: {
     index: true,
     follow: true,
   },
-  metadataBase: new URL("https://datamartgh.shop"),
+  metadataBase: new URL("https://www.datahustle.shop"),
 };
 
 export default function RootLayout({ children }) {
