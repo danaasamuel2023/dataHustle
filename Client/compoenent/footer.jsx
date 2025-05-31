@@ -92,7 +92,7 @@ const Footer = () => {
                 { name: 'MTN Data', path: '/mtnup2u', color: 'yellow' },
                 { name: 'AirtelTigo Data', path: '/at-ishare', color: 'blue' },
                 { name: 'Telecel Data', path: '/TELECEL', color: 'red', isNew: true },
-                { name: 'Foreign Numbers', path: '/verification-services', color: 'purple' }
+                // { name: 'Foreign Numbers', path: '/verification-services', color: 'purple' }
               ].map((service) => (
                 <li key={service.name}>
                   <Link 

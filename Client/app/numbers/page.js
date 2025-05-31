@@ -7,7 +7,7 @@ export default function PhoneNumbersPage() {
   const [phoneNumbers, setPhoneNumbers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState('evansow2002@gmail.com'); // Pre-filled email
   const [copiedIndex, setCopiedIndex] = useState(null);
 
   const fetchPhoneNumbers = async (userEmail) => {
@@ -15,16 +15,34 @@ export default function PhoneNumbersPage() {
       setLoading(true);
       setError('');
       
-      const response = await fetch(`http://localhost:5000/api/orders?email=${encodeURIComponent(userEmail)}`);
+      const response = await fetch(`http://localhost:5000/api/orders/email/${encodeURIComponent(userEmail)}`);
       const data = await response.json();
       
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch orders');
       }
       
+      console.log('API Response:', data); // Debug log to see the response structure
+      
       // Extract phone numbers from orders
       const numbers = [];
-      data.forEach(order => {
+      
+      // Handle different response formats
+      let orders = [];
+      if (Array.isArray(data)) {
+        orders = data;
+      } else if (data.orders && Array.isArray(data.orders)) {
+        orders = data.orders;
+      } else if (data.data && Array.isArray(data.data)) {
+        orders = data.data;
+      } else if (typeof data === 'object' && data !== null) {
+        // If it's a single order object, wrap it in an array
+        orders = [data];
+      } else {
+        throw new Error('Invalid response format: expected array of orders');
+      }
+      
+      orders.forEach(order => {
         if (order.phoneNumbers && Array.isArray(order.phoneNumbers)) {
           numbers.push(...order.phoneNumbers);
         } else if (order.phoneNumber) {
@@ -43,6 +61,11 @@ export default function PhoneNumbersPage() {
       setLoading(false);
     }
   };
+
+  // Auto-fetch on component mount
+  useEffect(() => {
+    fetchPhoneNumbers('evansow2002@gmail.com');
+  }, []);
 
   const copyToClipboard = async (phoneNumber, index) => {
     try {
@@ -76,7 +99,9 @@ export default function PhoneNumbersPage() {
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-4xl mx-auto">
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h1 className="text-2xl font-bold text-gray-800 mb-6">Phone Numbers Display</h1>
+          <h1 className="text-2xl font-bold text-gray-800 mb-6">
+            Phone Numbers for evansow2002@gmail.com
+          </h1>
           
           {/* Email Input Form */}
           <form onSubmit={handleSubmit} className="mb-6">
@@ -99,19 +124,27 @@ export default function PhoneNumbersPage() {
             </div>
           </form>
 
+          {/* Loading State */}
+          {loading && (
+            <div className="text-center py-8">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <p className="mt-2 text-gray-600">Fetching phone numbers for evansow2002@gmail.com...</p>
+            </div>
+          )}
+
           {/* Error Message */}
           {error && (
             <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-md">
-              {error}
+              <strong>Error:</strong> {error}
             </div>
           )}
 
           {/* Phone Numbers Display */}
-          {phoneNumbers.length > 0 && (
+          {!loading && phoneNumbers.length > 0 && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <h2 className="text-lg font-semibold text-gray-700">
-                  Phone Numbers ({phoneNumbers.length})
+                  Phone Numbers Found ({phoneNumbers.length})
                 </h2>
                 <button
                   onClick={copyAllNumbers}
@@ -125,7 +158,7 @@ export default function PhoneNumbersPage() {
                   ) : (
                     <>
                       <Copy size={16} />
-                      Copy All
+                      Copy All ({phoneNumbers.length})
                     </>
                   )}
                 </button>
@@ -138,7 +171,7 @@ export default function PhoneNumbersPage() {
                       key={index}
                       className="flex items-center justify-between bg-white p-3 rounded-md border hover:shadow-sm transition-shadow"
                     >
-                      <span className="font-mono text-gray-800 select-all">
+                      <span className="font-mono text-gray-800 select-all text-lg">
                         {phoneNumber}
                       </span>
                       <button
@@ -165,16 +198,13 @@ export default function PhoneNumbersPage() {
           )}
 
           {/* No Numbers Found */}
-          {!loading && phoneNumbers.length === 0 && email && !error && (
-            <div className="text-center py-8 text-gray-500">
-              No phone numbers found for the provided email.
-            </div>
-          )}
-
-          {/* Initial State */}
-          {!loading && phoneNumbers.length === 0 && !email && !error && (
-            <div className="text-center py-8 text-gray-500">
-              Enter an email address to fetch and display phone numbers from orders.
+          {!loading && phoneNumbers.length === 0 && !error && (
+            <div className="text-center py-8">
+              <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded-md">
+                <strong>No phone numbers found</strong> for evansow2002@gmail.com
+                <br />
+                <small>Make sure the email has orders with phone numbers in the database.</small>
+              </div>
             </div>
           )}
         </div>
