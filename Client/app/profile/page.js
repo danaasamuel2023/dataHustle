@@ -19,7 +19,10 @@ import {
   Percent,
   TrendingUp,
   Moon,
-  Sun
+  Sun,
+  Activity,
+  Target,
+  Star
 } from 'lucide-react';
 
 const UserStatsPage = () => {
@@ -100,6 +103,9 @@ const UserStatsPage = () => {
     setDarkMode(!darkMode);
   };
 
+  // Check if user is admin
+  const isAdmin = userData?.role === 'admin';
+
   // Fetch user stats when component mounts
   useEffect(() => {
     if (userData && authToken) {
@@ -157,25 +163,31 @@ const UserStatsPage = () => {
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
 
-  // Get status color
-  const getStatusColor = (status) => {
+  // Get status color and style
+  const getStatusStyle = (status) => {
     switch (status) {
       case 'approved':
-        return 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200';
+        return 'bg-gradient-to-r from-emerald-50 to-emerald-100 dark:from-emerald-900/30 dark:to-emerald-800/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700';
       case 'pending':
-        return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200';
+        return 'bg-gradient-to-r from-amber-50 to-amber-100 dark:from-amber-900/30 dark:to-amber-800/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700';
       case 'rejected':
-        return 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200';
+        return 'bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/30 dark:to-red-800/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-700';
       default:
-        return 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200';
+        return 'bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800/30 dark:to-slate-700/30 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600';
     }
   };
 
   // Show loading spinner if data is still loading
   if (!userData || !authToken || loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-900">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 dark:border-blue-400"></div>
+      <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+        <div className="text-center">
+          <div className="relative">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 dark:border-blue-800"></div>
+            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-600 dark:border-blue-400 absolute top-0 left-0"></div>
+          </div>
+          <p className="mt-4 text-slate-600 dark:text-slate-300 font-medium">Loading your statistics...</p>
+        </div>
       </div>
     );
   }
@@ -183,21 +195,23 @@ const UserStatsPage = () => {
   // Show error message if there was an error
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
-        <div className="max-w-4xl mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-          <div className="flex items-center justify-center text-red-500 dark:text-red-400 mb-4">
-            <AlertCircle className="w-12 h-12" />
-          </div>
-          <h2 className="text-xl text-center font-bold text-gray-800 dark:text-gray-100 mb-2">Error</h2>
-          <p className="text-center text-gray-600 dark:text-gray-300">{error}</p>
-          <div className="mt-6 flex justify-center">
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-lg flex items-center transition-colors"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Retry
-            </button>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 p-6">
+        <div className="max-w-2xl mx-auto mt-20">
+          <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 dark:border-slate-700/30 p-8">
+            <div className="text-center">
+              <div className="mx-auto w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-6">
+                <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-3">Oops! Something went wrong</h2>
+              <p className="text-slate-600 dark:text-slate-300 mb-8">{error}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 dark:from-blue-500 dark:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-0.5"
+              >
+                <RefreshCw className="w-5 h-5 mr-2" />
+                Try Again
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -205,212 +219,294 @@ const UserStatsPage = () => {
   }
   
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-6 transition-colors">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6 transition-colors">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-            <div className="mb-4 md:mb-0">
-              <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Your Account Statistics</h1>
-              <p className="text-gray-600 dark:text-gray-300 mt-1">View your account performance and activity</p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 transition-all duration-300">
+      <div className="max-w-7xl mx-auto p-4 md:p-8">
+        {/* Header Section */}
+        <div className="relative overflow-hidden bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 dark:border-slate-700/30 p-8 mb-8">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-indigo-600/5 dark:from-blue-400/5 dark:to-indigo-400/5"></div>
+          <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between">
+            <div className="mb-6 lg:mb-0">
+              <div className="flex items-center mb-3">
+                <div className="w-3 h-3 bg-emerald-400 rounded-full mr-3 animate-pulse"></div>
+                <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Live Dashboard</span>
+              </div>
+              <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 dark:from-slate-100 dark:to-slate-300 bg-clip-text text-transparent">
+                Account Overview
+              </h1>
+              <p className="text-slate-600 dark:text-slate-300 mt-2 text-lg">Track your performance and activity metrics</p>
             </div>
-            <div className="flex space-x-3">
+            <div className="flex items-center space-x-4">
               <button
                 onClick={toggleDarkMode}
-                className="flex items-center justify-center p-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                className="flex items-center justify-center w-12 h-12 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-600 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                 aria-label="Toggle dark mode"
               >
-                {darkMode ? (
-                  <Sun className="w-5 h-5" />
-                ) : (
-                  <Moon className="w-5 h-5" />
-                )}
+                {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>
               <button
                 onClick={fetchUserStats}
-                className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
+                className="flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 dark:from-blue-500 dark:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-0.5"
               >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh Stats
+                <RefreshCw className="w-5 h-5 mr-2" />
+                Refresh Data
               </button>
             </div>
           </div>
         </div>
         
-        {/* User Info Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6 transition-colors">
-          <div className="flex items-center mb-6">
-            <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-full mr-4 transition-colors">
-              <User className="w-8 h-8 text-blue-600 dark:text-blue-300" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-gray-800 dark:text-white">{userStats.userInfo.name}</h2>
-              <div className="flex items-center text-gray-600 dark:text-gray-300 mt-1">
-                <Mail className="w-4 h-4 mr-1" />
-                <span>{userStats.userInfo.email}</span>
+        {/* User Profile Card */}
+        <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 dark:border-slate-700/30 p-8 mb-8">
+          <div className="flex flex-col md:flex-row md:items-start md:space-x-8">
+            {/* Profile Avatar & Info */}
+            <div className="flex items-center mb-6 md:mb-0">
+              <div className="relative">
+                <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <User className="w-10 h-10 text-white" />
+                </div>
+                <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full border-2 border-white dark:border-slate-800 flex items-center justify-center">
+                  <CheckCircle className="w-3 h-3 text-white" />
+                </div>
               </div>
-              <div className="flex items-center text-gray-600 dark:text-gray-300 mt-1">
-                <Phone className="w-4 h-4 mr-1" />
-                <span>{userStats.userInfo.phoneNumber}</span>
+              <div className="ml-6">
+                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">{userStats.userInfo.name}</h2>
+                <div className="flex items-center text-slate-600 dark:text-slate-300 mt-1">
+                  <Mail className="w-4 h-4 mr-2" />
+                  <span className="text-sm">{userStats.userInfo.email}</span>
+                </div>
+                <div className="flex items-center text-slate-600 dark:text-slate-300 mt-1">
+                  <Phone className="w-4 h-4 mr-2" />
+                  <span className="text-sm">{userStats.userInfo.phoneNumber}</span>
+                </div>
               </div>
             </div>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Account Status */}
-            <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg transition-colors">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-gray-500 dark:text-gray-400 text-sm">Account Status</p>
-                  <div className={`mt-1 px-2 py-1 rounded text-xs font-medium inline-block capitalize ${getStatusColor(userStats.userInfo.accountStatus)}`}>
+            
+            {/* Quick Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1">
+              {/* Account Status */}
+              <div className="group">
+                <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700/50 dark:to-slate-600/50 rounded-xl p-5 border border-slate-200/50 dark:border-slate-600/30 hover:shadow-lg transition-all duration-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
+                      <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                  </div>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-2">Account Status</p>
+                  <div className={`px-3 py-1.5 rounded-lg text-sm font-semibold inline-block capitalize ${getStatusStyle(userStats.userInfo.accountStatus)}`}>
                     {userStats.userInfo.accountStatus}
                   </div>
                 </div>
-                <div className="bg-white dark:bg-gray-600 p-2 rounded-full transition-colors">
-                  <CheckCircle className="w-5 h-5 text-blue-600 dark:text-blue-300" />
+              </div>
+              
+              {/* Wallet Balance */}
+              <div className="group">
+                <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700/50 dark:to-slate-600/50 rounded-xl p-5 border border-slate-200/50 dark:border-slate-600/30 hover:shadow-lg transition-all duration-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                      <Wallet className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                  </div>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-2">Wallet Balance</p>
+                  <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{formatCurrency(userStats.userInfo.walletBalance)}</p>
                 </div>
               </div>
-            </div>
-            
-            {/* Wallet Balance */}
-            <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg transition-colors">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-gray-500 dark:text-gray-400 text-sm">Wallet Balance</p>
-                  <p className="text-xl font-bold text-gray-800 dark:text-white mt-1">{formatCurrency(userStats.userInfo.walletBalance)}</p>
-                </div>
-                <div className="bg-white dark:bg-gray-600 p-2 rounded-full transition-colors">
-                  <Wallet className="w-5 h-5 text-blue-600 dark:text-blue-300" />
-                </div>
-              </div>
-            </div>
-            
-            {/* Account Age */}
-            <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg transition-colors">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-gray-500 dark:text-gray-400 text-sm">Account Age</p>
-                  <p className="text-xl font-bold text-gray-800 dark:text-white mt-1">{userStats.userInfo.accountAge} days</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Since {formatDate(userStats.userInfo.registrationDate)}</p>
-                </div>
-                <div className="bg-white dark:bg-gray-600 p-2 rounded-full transition-colors">
-                  <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-300" />
+              
+              {/* Account Age */}
+              <div className="group">
+                <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700/50 dark:to-slate-600/50 rounded-xl p-5 border border-slate-200/50 dark:border-slate-600/30 hover:shadow-lg transition-all duration-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+                      <Calendar className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                    </div>
+                  </div>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-2">Member Since</p>
+                  <p className="text-xl font-bold text-slate-800 dark:text-slate-100">{userStats.userInfo.accountAge} days</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{formatDate(userStats.userInfo.registrationDate)}</p>
                 </div>
               </div>
             </div>
           </div>
         </div>
         
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          {/* Deposit Stats */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 transition-colors">
-            <div className="flex items-center mb-4">
-              <div className="bg-green-100 dark:bg-green-900 p-2 rounded-full mr-3 transition-colors">
-                <CreditCard className="w-6 h-6 text-green-600 dark:text-green-300" />
+        {/* Statistics Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* Deposit Statistics */}
+          <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 dark:border-slate-700/30 p-8">
+            <div className="flex items-center mb-8">
+              <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
+                <CreditCard className="w-7 h-7 text-white" />
               </div>
-              <h3 className="text-lg font-bold text-gray-800 dark:text-white">Deposit Statistics</h3>
+              <div>
+                <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Deposit Activity</h3>
+                <p className="text-slate-600 dark:text-slate-300 text-sm">Your funding history</p>
+              </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg transition-colors">
-                <p className="text-gray-500 dark:text-gray-400 text-sm">Total Amount Deposited</p>
-                <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{formatCurrency(userStats.depositStats.totalAmount)}</p>
+            <div className="space-y-6">
+              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-xl p-6 border border-emerald-200/50 dark:border-emerald-700/30">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-emerald-700 dark:text-emerald-300 text-sm font-semibold mb-1">Total Deposited</p>
+                    <p className="text-3xl font-bold text-emerald-800 dark:text-emerald-200">{formatCurrency(userStats.depositStats.totalAmount)}</p>
+                  </div>
+                  <div className="w-12 h-12 bg-emerald-200 dark:bg-emerald-800 rounded-lg flex items-center justify-center">
+                    <TrendingUp className="w-6 h-6 text-emerald-700 dark:text-emerald-300" />
+                  </div>
+                </div>
               </div>
               
-              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg transition-colors">
-                <p className="text-gray-500 dark:text-gray-400 text-sm">Number of Deposits</p>
-                <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{userStats.depositStats.numberOfDeposits}</p>
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-6 border border-blue-200/50 dark:border-blue-700/30">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-blue-700 dark:text-blue-300 text-sm font-semibold mb-1">Total Transactions</p>
+                    <p className="text-3xl font-bold text-blue-800 dark:text-blue-200">{userStats.depositStats.numberOfDeposits}</p>
+                  </div>
+                  <div className="w-12 h-12 bg-blue-200 dark:bg-blue-800 rounded-lg flex items-center justify-center">
+                    <Activity className="w-6 h-6 text-blue-700 dark:text-blue-300" />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
           
-          {/* Order Stats */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 transition-colors">
-            <div className="flex items-center mb-4">
-              <div className="bg-blue-100 dark:bg-blue-900 p-2 rounded-full mr-3 transition-colors">
-                <ShoppingCart className="w-6 h-6 text-blue-600 dark:text-blue-300" />
+          {/* Order Statistics */}
+          <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 dark:border-slate-700/30 p-8">
+            <div className="flex items-center mb-8">
+              <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
+                <ShoppingCart className="w-7 h-7 text-white" />
               </div>
-              <h3 className="text-lg font-bold text-gray-800 dark:text-white">Order Statistics</h3>
+              <div>
+                <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Order Performance</h3>
+                <p className="text-slate-600 dark:text-slate-300 text-sm">Your purchase statistics</p>
+              </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg transition-colors">
-                <p className="text-gray-500 dark:text-gray-400 text-sm">Total Orders</p>
-                <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{userStats.orderStats.totalOrders}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700/50 dark:to-slate-600/50 rounded-xl p-5 border border-slate-200/50 dark:border-slate-600/30">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-10 h-10 bg-slate-200 dark:bg-slate-600 rounded-lg flex items-center justify-center">
+                    <Target className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+                  </div>
+                </div>
+                <p className="text-slate-600 dark:text-slate-400 text-sm font-medium mb-1">Total Orders</p>
+                <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{userStats.orderStats.totalOrders}</p>
               </div>
               
-              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg transition-colors">
-                <p className="text-gray-500 dark:text-gray-400 text-sm">Successful Orders</p>
-                <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{userStats.orderStats.successfulOrders}</p>
+              <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/30 dark:to-emerald-800/30 rounded-xl p-5 border border-emerald-200/50 dark:border-emerald-700/30">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-10 h-10 bg-emerald-200 dark:bg-emerald-700 rounded-lg flex items-center justify-center">
+                    <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-300" />
+                  </div>
+                </div>
+                <p className="text-emerald-700 dark:text-emerald-300 text-sm font-medium mb-1">Successful</p>
+                <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-200">{userStats.orderStats.successfulOrders}</p>
               </div>
               
-              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg transition-colors">
-                <p className="text-gray-500 dark:text-gray-400 text-sm">Success Rate</p>
-                <div className="flex items-center mt-1">
-                  <p className="text-2xl font-bold text-gray-800 dark:text-white">{userStats.orderStats.successRate}%</p>
-                  <Percent className="w-4 h-4 text-gray-500 dark:text-gray-400 ml-1" />
+              <div className="md:col-span-2">
+                <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl p-6 border border-purple-200/50 dark:border-purple-700/30">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-purple-700 dark:text-purple-300 text-sm font-semibold mb-2">Success Rate</p>
+                      <div className="flex items-center">
+                        <span className="text-3xl font-bold text-purple-800 dark:text-purple-200 mr-2">{userStats.orderStats.successRate}%</span>
+                        <Star className="w-6 h-6 text-yellow-500" />
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="w-16 h-16 relative">
+                        <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 64 64">
+                          <circle
+                            cx="32"
+                            cy="32"
+                            r="28"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                            fill="none"
+                            className="text-purple-200 dark:text-purple-800"
+                          />
+                          <circle
+                            cx="32"
+                            cy="32"
+                            r="28"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                            fill="none"
+                            strokeDasharray={`${(userStats.orderStats.successRate / 100) * 175.93} 175.93`}
+                            className="text-purple-600 dark:text-purple-400"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
         
-        {/* Ranking Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 transition-colors">
-          <div className="flex items-center mb-6">
-            <div className="bg-purple-100 dark:bg-purple-900 p-2 rounded-full mr-3 transition-colors">
-              <Award className="w-6 h-6 text-purple-600 dark:text-purple-300" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-800 dark:text-white">Your Ranking</h3>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-gray-50 dark:bg-gray-700 p-5 rounded-lg text-center transition-colors">
-              <div className="w-16 h-16 mx-auto bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center mb-3 transition-colors">
-                <Award className="w-8 h-8 text-purple-600 dark:text-purple-300" />
+        {/* Admin-only Ranking Section */}
+        {isAdmin && userStats.ranking && (
+          <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 dark:border-slate-700/30 p-8">
+            <div className="flex items-center mb-8">
+              <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
+                <Award className="w-7 h-7 text-white" />
               </div>
-              <p className="text-gray-500 dark:text-gray-400 text-sm mb-1">Your Position</p>
-              <div className="flex items-center justify-center">
-                <span className="text-3xl font-bold text-gray-800 dark:text-white mr-1">#{userStats.ranking.position}</span>
-                <span className="text-sm text-gray-500 dark:text-gray-400">/ {userStats.ranking.outOf}</span>
+              <div>
+                <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">User Rankings</h3>
+                <p className="text-slate-600 dark:text-slate-300 text-sm">Admin view: Community standings</p>
               </div>
             </div>
             
-            <div className="bg-gray-50 dark:bg-gray-700 p-5 rounded-lg transition-colors">
-              <h4 className="text-gray-700 dark:text-gray-200 font-medium mb-3">Percentile Ranking</h4>
-              <div className="bg-gray-200 dark:bg-gray-600 h-4 rounded-full overflow-hidden transition-colors">
-                <div 
-                  className="bg-purple-600 dark:bg-purple-500 h-full rounded-full transition-colors" 
-                  style={{ width: `${userStats.ranking.percentile}%` }}
-                ></div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="text-center">
+                <div className="relative inline-block mb-6">
+                  <div className="w-24 h-24 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl flex items-center justify-center shadow-xl">
+                    <Award className="w-12 h-12 text-white" />
+                  </div>
+                  <div className="absolute -top-2 -right-2 w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                    #{userStats.ranking.position}
+                  </div>
+                </div>
+                <p className="text-slate-600 dark:text-slate-400 text-sm font-medium mb-2">Current Position</p>
+                <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">#{userStats.ranking.position} of {userStats.ranking.outOf}</p>
               </div>
-              <div className="flex justify-between mt-2 text-sm">
-                <span className="text-gray-600 dark:text-gray-300">Top {userStats.ranking.percentile}%</span>
-                <span className="text-gray-600 dark:text-gray-300">Better than {100 - userStats.ranking.percentile}% users</span>
-              </div>
-            </div>
-            
-            <div className="bg-gray-50 dark:bg-gray-700 p-5 rounded-lg transition-colors">
-              <h4 className="text-gray-700 dark:text-gray-200 font-medium mb-3">What This Means</h4>
-              <p className="text-gray-600 dark:text-gray-300 text-sm">
-                {userStats.ranking.position <= 10 ? (
-                  "You're among our top users! Your continued business helps us grow."
-                ) : userStats.ranking.position <= 50 ? (
-                  "You're a valued customer in our community. Keep ordering to improve your rank!"
-                ) : (
-                  "You're on your way up! More orders will boost your ranking."
-                )}
-              </p>
-              <div className="mt-3">
-                <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
-                  <TrendingUp className="w-4 h-4 mr-2 text-green-500 dark:text-green-400" />
-                  <span>More orders = Higher ranking</span>
+              
+              <div className="lg:col-span-2 space-y-6">
+                <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl p-6 border border-purple-200/50 dark:border-purple-700/30">
+                  <h4 className="text-purple-800 dark:text-purple-200 font-semibold mb-4">Percentile Ranking</h4>
+                  <div className="relative">
+                    <div className="bg-purple-200 dark:bg-purple-800 h-3 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-gradient-to-r from-purple-500 to-pink-500 h-full rounded-full transition-all duration-1000 ease-out" 
+                        style={{ width: `${userStats.ranking.percentile}%` }}
+                      ></div>
+                    </div>
+                    <div className="flex justify-between mt-3 text-sm">
+                      <span className="text-purple-700 dark:text-purple-300 font-medium">Top {userStats.ranking.percentile}%</span>
+                      <span className="text-slate-600 dark:text-slate-300">Better than {100 - userStats.ranking.percentile}% of users</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-6 border border-blue-200/50 dark:border-blue-700/30">
+                  <h4 className="text-blue-800 dark:text-blue-200 font-semibold mb-3">Performance Insights</h4>
+                  <p className="text-blue-700 dark:text-blue-300 text-sm leading-relaxed">
+                    {userStats.ranking.position <= 10 ? (
+                      "🏆 Outstanding performance! This user is among our top performers and significantly contributes to platform growth."
+                    ) : userStats.ranking.position <= 50 ? (
+                      "⭐ Excellent user engagement. This member shows consistent activity and good platform utilization."
+                    ) : (
+                      "📈 Growing user with potential. Encouraging more activity could improve their ranking and engagement."
+                    )}
+                  </p>
+                  <div className="mt-4 flex items-center text-sm text-blue-600 dark:text-blue-400">
+                    <TrendingUp className="w-4 h-4 mr-2" />
+                    <span className="font-medium">Admin Analytics: Track user progression patterns</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
