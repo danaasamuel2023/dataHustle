@@ -7,12 +7,12 @@ const BlockedDeviceSchema = new mongoose.Schema({
   ipAddress: { type: String },
   reason: { type: String },
   blockedAt: { type: Date, default: Date.now },
-  blockedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" }
+  blockedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Userdatahustle" }
 });
 
 // Friend Registration Schema - for tracking registered friends
 const RegisteredFriendSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "Userdatahustle" },
   name: { type: String },
   email: { type: String },
   phoneNumber: { type: String },
@@ -31,7 +31,7 @@ const UserSchema = new mongoose.Schema({
   referredBy: { type: String, default: null }, // Who referred this user
   
   // Friend registration tracking
-  registeredByUserId: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // User who registered this user
+  registeredByUserId: { type: mongoose.Schema.Types.ObjectId, ref: "Userdatahustle" }, // User who registered this user
   registeredFriends: [RegisteredFriendSchema], // Friends registered by this user
   
   createdAt: { type: Date, default: Date.now },
@@ -63,7 +63,7 @@ const UserSchema = new mongoose.Schema({
   },
   approvedBy: { 
     type: mongoose.Schema.Types.ObjectId, 
-    ref: "User" 
+    ref: "Userdatahustle" 
   },
   approvedAt: { 
     type: Date 
@@ -78,7 +78,7 @@ UserSchema.index({ approvalStatus: 1 });
 
 // Other schemas remain the same...
 const DataPurchaseSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, 
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "Userdatahustle", required: true }, 
   phoneNumber: { type: String, required: true }, 
   network: { type: String, enum: ["YELLO", "TELECEL", "AT_PREMIUM","airteltigo","at"], required: true },
   capacity: { type: Number, required: true }, 
@@ -91,7 +91,7 @@ const DataPurchaseSchema = new mongoose.Schema({
   processing: { type: Boolean, default: false },
   // Add these fields for admin notes and update tracking
   adminNotes: { type: String },
-  updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Userdatahustle" },
   updatedAt: { type: Date },
   createdAt: { type: Date, default: Date.now }
  
@@ -100,7 +100,7 @@ const DataPurchaseSchema = new mongoose.Schema({
 const TransactionSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: 'Userdatahustle',
     required: true
   },
   type: {
@@ -144,8 +144,8 @@ const TransactionSchema = new mongoose.Schema({
 
 // Updated ReferralBonus Schema to include friend registration type
 const ReferralBonusSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, 
-  referredUserId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, 
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "Userdatahustle", required: true }, 
+  referredUserId: { type: mongoose.Schema.Types.ObjectId, ref: "Userdatahustle", required: true }, 
   amount: { type: Number, required: true }, 
   status: { type: String, enum: ["pending", "credited"], default: "pending" },
   // Added registration type field to track how the user was referred
@@ -165,7 +165,7 @@ const Schema = mongoose.Schema;
 const apiKeySchema = new Schema({
     userId: {
         type: Schema.Types.ObjectId,
-        ref: 'User',
+        ref: 'Userdatahustle',
         required: true
     },
     key: {
@@ -201,7 +201,7 @@ apiKeySchema.index({ userId: 1 });
 const OrderReportSchema = new mongoose.Schema({
   userId: { 
     type: mongoose.Schema.Types.ObjectId, 
-    ref: "User", 
+    ref: "Userdatahustle", 
     required: true 
   },
   purchaseId: { 
