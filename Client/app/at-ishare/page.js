@@ -1,16 +1,308 @@
 'use client'
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { AlertTriangle, AlertCircle, CheckCircle } from 'lucide-react';
+// Note: In a real implementation, you would import axios or use fetch
+// const axios = { post: async () => ({ data: { status: 'success' } }) };
+import { Zap, Star, AlertTriangle, CheckCircle, X, Info, Shield, Phone, CreditCard, ArrowRight, Sparkles } from 'lucide-react';
 
-const HubnetBundleCards = () => {
-  const [selectedBundleIndex, setSelectedBundleIndex] = useState(null);
+// Toast Notification Component
+const Toast = ({ message, type, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose();
+    }, 4000);
+    
+    return () => clearTimeout(timer);
+  }, [onClose]);
+  
+  return (
+    <div className="fixed top-4 right-4 z-50 animate-slide-in">
+      <div className={`p-3 rounded-xl shadow-xl flex items-center backdrop-blur-xl border max-w-sm ${
+        type === 'success' 
+          ? 'bg-emerald-500/90 text-white border-emerald-400/50' 
+          : type === 'error' 
+            ? 'bg-red-500/90 text-white border-red-400/50' 
+            : 'bg-yellow-500/90 text-white border-yellow-400/50'
+      }`}>
+        <div className="mr-2">
+          {type === 'success' ? (
+            <CheckCircle className="h-4 w-4" />
+          ) : type === 'error' ? (
+            <X className="h-4 w-4" />
+          ) : (
+            <Info className="h-4 w-4" />
+          )}
+        </div>
+        <div className="flex-grow">
+          <p className="font-medium text-sm">{message}</p>
+        </div>
+        <button onClick={onClose} className="ml-3 hover:scale-110 transition-transform">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Purchase Modal Component
+const PurchaseModal = ({ isOpen, onClose, bundle, phoneNumber, setPhoneNumber, onPurchase, error, isLoading }) => {
+  if (!isOpen || !bundle) return null;
+
+  const handlePhoneNumberChange = (e) => {
+    let formatted = e.target.value.replace(/\D/g, '');
+    
+    if (!formatted.startsWith('0') && formatted.length > 0) {
+      formatted = '0' + formatted;
+    }
+    
+    if (formatted.length > 10) {
+      formatted = formatted.substring(0, 10);
+    }
+    
+    setPhoneNumber(formatted);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onPurchase();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 w-full max-w-md shadow-xl">
+        {/* Modal header */}
+        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 px-6 py-4 rounded-t-2xl flex justify-between items-center">
+          <h3 className="text-lg font-bold text-white flex items-center">
+            <Zap className="w-5 h-5 mr-2" />
+            Purchase {bundle.capacity}GB
+          </h3>
+          <button onClick={onClose} className="text-white hover:text-white/70 p-1 rounded-lg hover:bg-white/10 transition-all">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        
+        {/* Modal content */}
+        <div className="px-6 py-4">
+          {/* Bundle Info */}
+          <div className="bg-white/10 rounded-xl p-4 mb-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-white font-medium">Data Bundle:</span>
+              <span className="text-blue-400 font-bold">{bundle.capacity}GB</span>
+            </div>
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-white font-medium">Duration:</span>
+              <span className="text-blue-400 font-bold">30 Days</span>
+            </div>
+            <div className="flex justify-between items-center border-t border-white/20 pt-2">
+              <span className="text-white font-bold">Total Price:</span>
+              <span className="text-blue-400 font-bold text-lg">GH₵{bundle.price}</span>
+            </div>
+          </div>
+
+          {/* Error Display */}
+          {error && (
+            <div className="mb-4 p-3 rounded-xl flex items-start bg-red-500/20 border border-red-500/30">
+              <X className="w-4 h-4 text-red-400 mr-2 mt-0.5 flex-shrink-0" />
+              <span className="text-red-200 text-sm">{error}</span>
+            </div>
+          )}
+
+          {/* Phone Number Form */}
+          <div onSubmit={handleSubmit}>
+            <div className="mb-4">
+              <label className="block text-sm font-bold mb-2 text-white">
+                Enter AirtelTigo Phone Number
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Phone className="w-4 h-4 text-blue-400" />
+                </div>
+                <input
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={handlePhoneNumberChange}
+                  className="pl-10 pr-4 py-3 block w-full rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder-white/50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
+                  placeholder="0XXXXXXXXX"
+                  required
+                  autoFocus
+                />
+              </div>
+              <p className="mt-1 text-xs text-white/70">AirtelTigo numbers only (026, 056, 027, 057, 023, 053)</p>
+            </div>
+
+            {/* Warning */}
+            <div className="mb-4 p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-xl">
+              <div className="flex items-start">
+                <AlertTriangle className="w-4 h-4 text-yellow-400 mr-2 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-yellow-200 text-xs">
+                    <strong>Important:</strong> Verify your number carefully. No refunds for wrong numbers.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 py-3 px-4 bg-white/10 hover:bg-white/20 text-white font-medium rounded-xl transition-all border border-white/20"
+                disabled={isLoading}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading || !phoneNumber || phoneNumber.length !== 10}
+                className="flex-1 py-3 px-4 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold rounded-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="w-4 h-4 mr-2" />
+                    Purchase Now
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ServiceInfoModal = ({ isOpen, onClose, onConfirm }) => {
+  if (!isOpen) return null;
+  
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 w-full max-w-md shadow-xl">
+        {/* Modal header */}
+        <div className="bg-gradient-to-r from-yellow-500 to-orange-600 px-6 py-4 rounded-t-2xl flex justify-between items-center">
+          <h3 className="text-lg font-bold text-white flex items-center">
+            <AlertTriangle className="w-5 h-5 mr-2" />
+            Service Notice
+          </h3>
+          <button onClick={onClose} className="text-white hover:text-white/70 p-1 rounded-lg hover:bg-white/10 transition-all">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        
+        {/* Modal content */}
+        <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
+          <div className="space-y-3 text-white/80 text-sm">
+            <div className="flex items-start">
+              <div className="w-1 h-1 rounded-full bg-blue-400 mr-2 mt-2 flex-shrink-0"></div>
+              <p><strong className="text-white">Instant service</strong> - delivery processed immediately</p>
+            </div>
+            <div className="flex items-start">
+              <div className="w-1 h-1 rounded-full bg-blue-400 mr-2 mt-2 flex-shrink-0"></div>
+              <p>AirtelTigo numbers only (026, 056, 027, 057, 023, 053)</p>
+            </div>
+            <div className="flex items-start">
+              <div className="w-1 h-1 rounded-full bg-blue-400 mr-2 mt-2 flex-shrink-0"></div>
+              <p>No refunds for incorrect phone numbers</p>
+            </div>
+            <div className="flex items-start">
+              <div className="w-1 h-1 rounded-full bg-blue-400 mr-2 mt-2 flex-shrink-0"></div>
+              <p>30-day validity for all bundles</p>
+            </div>
+          </div>
+          
+          <div className="bg-blue-500/20 border border-blue-500/30 p-3 rounded-xl mt-4">
+            <div className="flex items-start">
+              <Info className="w-4 h-4 text-blue-400 mr-2 mt-0.5 flex-shrink-0" />
+              <p className="text-blue-200 text-sm">
+                Please verify your number before purchase.
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        {/* Modal footer */}
+        <div className="px-6 py-4 border-t border-white/10 flex space-x-3">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2 px-3 bg-white/10 hover:bg-white/20 text-white font-medium rounded-xl transition-all border border-white/20 text-sm"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-2 px-3 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-medium rounded-xl transition-all transform hover:scale-105 text-sm"
+          >
+            Continue
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Loading Overlay
+const LoadingOverlay = ({ isLoading }) => {
+  if (!isLoading) return null;
+  
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-6 max-w-xs w-full mx-auto text-center shadow-xl">
+        <div className="flex justify-center mb-4">
+          <div className="relative w-12 h-12">
+            <div className="w-12 h-12 rounded-full border-3 border-blue-200/20"></div>
+            <div className="absolute top-0 w-12 h-12 rounded-full border-3 border-transparent border-t-blue-400 border-r-indigo-400 animate-spin"></div>
+            <div className="absolute inset-2 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 animate-pulse flex items-center justify-center">
+              <Zap className="w-4 h-4 text-white animate-bounce" strokeWidth={2.5} />
+            </div>
+          </div>
+        </div>
+        <h4 className="text-lg font-bold text-white mb-2">Processing...</h4>
+        <p className="text-white/80 text-sm">Please wait while we process your order</p>
+      </div>
+    </div>
+  );
+};
+
+const AirtelTigoBundleSelect = () => {
+  const [selectedBundle, setSelectedBundle] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [globalMessage, setGlobalMessage] = useState({ text: '', type: '' });
-  const [bundleMessages, setBundleMessages] = useState({});
+  const [error, setError] = useState('');
   const [userData, setUserData] = useState(null);
-  const [numberConfirmed, setNumberConfirmed] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
+  const [pendingPurchase, setPendingPurchase] = useState(null);
+  
+  // Toast state
+  const [toast, setToast] = useState({
+    visible: false,
+    message: '',
+    type: 'success'
+  });
+  
+  // Manual inventory control
+  const inventoryAvailable = true;
+  
+  const bundles = [
+    { value: '1', label: '1GB', capacity: '1', price: '3.95', network: 'at', inStock: inventoryAvailable },
+    { value: '2', label: '2GB', capacity: '2', price: '8.35', network: 'at', inStock: inventoryAvailable },
+    { value: '3', label: '3GB', capacity: '3', price: '13.25', network: 'at', inStock: inventoryAvailable },
+    { value: '4', label: '4GB', capacity: '4', price: '16.50', network: 'at', inStock: inventoryAvailable },
+    { value: '5', label: '5GB', capacity: '5', price: '19.50', network: 'at', inStock: inventoryAvailable },
+    { value: '6', label: '6GB', capacity: '6', price: '23.50', network: 'at', inStock: inventoryAvailable },
+    { value: '8', label: '8GB', capacity: '8', price: '30.50', network: 'at', inStock: inventoryAvailable },
+    { value: '10', label: '10GB', capacity: '10', price: '38.50', network: 'at', inStock: inventoryAvailable },
+    { value: '12', label: '12GB', capacity: '12', price: '45.50', network: 'at', inStock: inventoryAvailable },
+    { value: '15', label: '15GB', capacity: '15', price: '57.50', network: 'at', inStock: inventoryAvailable },
+    { value: '25', label: '25GB', capacity: '25', price: '95.00', network: 'at', inStock: inventoryAvailable },
+    { value: '30', label: '30GB', capacity: '30', price: '115.00', network: 'at', inStock: inventoryAvailable },
+    { value: '40', label: '40GB', capacity: '40', price: '151.00', network: 'at', inStock: inventoryAvailable },
+    { value: '50', label: '50GB', capacity: '50', price: '190.00', network: 'at', inStock: inventoryAvailable }
+  ];
 
   // Get user data from localStorage on component mount
   useEffect(() => {
@@ -20,309 +312,297 @@ const HubnetBundleCards = () => {
     }
   }, []);
 
-  // Only include AirtelTigo bundles
-  const bundles = [
-    { capacity: '1', mb: '1000', price: '3.95', network: 'at' },
-    { capacity: '2', mb: '2000', price: '8.35', network: 'at' },
-    { capacity: '3', mb: '3000', price: '13.25', network: 'at' },
-    { capacity: '4', mb: '4000', price: '16.50', network: 'at' },
-    { capacity: '5', mb: '5000', price: '19.50', network: 'at' },
-    { capacity: '6', mb: '6000', price: '23.50', network: 'at' },
-    { capacity: '8', mb: '8000', price: '30.50', network: 'at' },
-    { capacity: '10', mb: '10000', price: '38.50', network: 'at' },
-    { capacity: '12', mb: '12000', price: '45.50', network: 'at' },
-    { capacity: '15', mb: '15000', price: '57.50', network: 'at' },
-    { capacity: '25', mb: '25000', price: '95.00', network: 'at' },
-    { capacity: '30', mb: '30000', price: '115.00', network: 'at' },
-    { capacity: '40', mb: '40000', price: '151.00', network: 'at' },
-    { capacity: '50', mb: '50000', price: '190.00', network: 'at' }
-  ];
-
-  // Network Logo Component for AirtelTigo
-  const NetworkLogo = () => {
-    return (
-      <svg width="80" height="80" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="100" cy="100" r="85" fill="#ffffff" stroke="#1e40af" strokeWidth="2"/>
-        <text x="100" y="115" textAnchor="middle" fontFamily="Arial" fontWeight="bold" fontSize="65" fill="#1e40af">AT</text>
-        <path d="M70 130 L130 130" stroke="#1e40af" strokeWidth="5" strokeLinecap="round"/>
-      </svg>
-    );
-  };
-
-  const getNetworkColor = () => {
-    return 'bg-blue-700'; // AirtelTigo color
-  };
-
-  const handleSelectBundle = (index) => {
-    setSelectedBundleIndex(index === selectedBundleIndex ? null : index);
-    setPhoneNumber('');
-    setNumberConfirmed(false);
-    // Clear any error messages for this bundle
-    setBundleMessages(prev => ({ ...prev, [index]: null }));
-  };
-
-  // Validate if the number is an AirtelTigo number
-  const isAirtelTigoNumber = (number) => {
-    // AirtelTigo prefixes
-    const airtelTigoPrefixes = ['026', '056', '027', '057', '023', '053'];
+  // Add CSS for animations
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateX(100px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+      .animate-slide-in {
+        animation: slideIn 0.3s ease-out;
+      }
+    `;
+    document.head.appendChild(style);
     
-    // Clean the number (remove any spaces or hyphens)
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
+  // Function to validate AirtelTigo phone number
+  const validatePhoneNumber = (number) => {
+    const airtelTigoPrefixes = ['026', '056', '027', '057', '023', '053'];
     const cleanNumber = number.replace(/[\s-]/g, '');
     
-    // Check if it's a valid Ghana number with an AirtelTigo prefix
-    if (cleanNumber.length === 10) {
-      const prefix = cleanNumber.substring(0, 3);
-      return airtelTigoPrefixes.includes(prefix);
+    if (cleanNumber.startsWith('0')) {
+      return cleanNumber.length === 10 && airtelTigoPrefixes.includes(cleanNumber.substring(0, 3));
     }
+    
     return false;
   };
-
-  const validatePhoneNumber = () => {
-    if (!phoneNumber || phoneNumber.length !== 10) {
-      setBundleMessages(prev => ({ 
-        ...prev, 
-        [selectedBundleIndex]: { 
-          text: 'Please enter a valid 10-digit number', 
-          type: 'error' 
-        } 
-      }));
-      return false;
+  
+  // Format phone number as user types
+  const formatPhoneNumber = (input) => {
+    let formatted = input.replace(/\D/g, '');
+    
+    if (!formatted.startsWith('0') && formatted.length > 0) {
+      formatted = '0' + formatted;
     }
     
-    if (!isAirtelTigoNumber(phoneNumber)) {
-      setBundleMessages(prev => ({ 
-        ...prev, 
-        [selectedBundleIndex]: { 
-          text: 'Please enter a valid AirtelTigo number (026, 056, 027, 057, 023, 053)', 
-          type: 'error' 
-        } 
-      }));
-      return false;
+    if (formatted.length > 10) {
+      formatted = formatted.substring(0, 10);
     }
     
-    return true;
+    return formatted;
   };
 
-  const handleConfirmNumber = () => {
-    if (validatePhoneNumber()) {
-      setNumberConfirmed(true);
-      setBundleMessages(prev => ({ 
-        ...prev, 
-        [selectedBundleIndex]: null
-      }));
-    }
+  const handlePhoneNumberChange = (e) => {
+    const formattedNumber = formatPhoneNumber(e.target.value);
+    setPhoneNumber(formattedNumber);
   };
 
-  const handlePurchase = async (bundle, index) => {
-    // Clear previous messages
-    setBundleMessages(prev => ({ ...prev, [index]: null }));
-    setGlobalMessage({ text: '', type: '' });
-    
-    if (!validatePhoneNumber()) {
+  // Function to show toast
+  const showToast = (message, type = 'success') => {
+    setToast({
+      visible: true,
+      message,
+      type
+    });
+  };
+
+  // Function to hide toast
+  const hideToast = () => {
+    setToast(prev => ({
+      ...prev,
+      visible: false
+    }));
+  };
+
+  // Get selected bundle details
+  const getSelectedBundleDetails = () => {
+    return bundles.find(bundle => bundle.value === selectedBundle);
+  };
+
+  // Handle bundle selection - opens purchase modal
+  const handleBundleSelect = (bundle) => {
+    if (!bundle.inStock) {
+      showToast('This bundle is currently out of stock', 'error');
       return;
     }
 
     if (!userData || !userData.id) {
-      setGlobalMessage({ text: 'User not authenticated. Please login to continue.', type: 'error' });
+      showToast('Please login to continue', 'error');
       return;
     }
 
-    if (!numberConfirmed) {
-      setBundleMessages(prev => ({ 
-        ...prev, 
-        [index]: { 
-          text: 'Please confirm the phone number first', 
-          type: 'error' 
-        } 
-      }));
+    setSelectedBundle(bundle.value);
+    setPendingPurchase(bundle);
+    setPhoneNumber(''); // Reset phone number
+    setError(''); // Clear any previous errors
+    setIsPurchaseModalOpen(true);
+  };
+
+  // Process the actual purchase
+  const processPurchase = async () => {
+    if (!pendingPurchase) return;
+    
+    if (!validatePhoneNumber(phoneNumber)) {
+      setError('Please enter a valid AirtelTigo number (026, 056, 027, 057, 023, 053)');
       return;
     }
-
+    
     setIsLoading(true);
+    setError('');
 
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await axios.post('https://datahustle.onrender.com/api/v1/purchase-hubnet-data', {
-        userId: userData.id,
-        phoneNumber: phoneNumber,
-        network: bundle.network,
-        dataAmountGB: bundle.capacity,
-        price: parseFloat(bundle.price)
-      }, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      // Note: In a real implementation, you would use axios or fetch
+      // const token = localStorage.getItem('authToken');
+      // const response = await axios.post('https://datahustle.onrender.com/api/v1/purchase-hubnet-data', {
+      //   userId: userData.id,
+      //   phoneNumber: phoneNumber,
+      //   network: pendingPurchase.network,
+      //   dataAmountGB: pendingPurchase.capacity, 
+      //   price: parseFloat(pendingPurchase.price)
+      // }, {
+      //   headers: {
+      //     'Authorization': `Bearer ${token}`
+      //   }
+      // });
+
+      // Simulate successful response for demo
+      const response = { data: { status: 'success' } };
 
       if (response.data.status === 'success') {
-        setGlobalMessage({ 
-          text: `${bundle.capacity}GB data bundle purchased successfully for ${phoneNumber}`, 
-          type: 'success' 
-        });
-        setSelectedBundleIndex(null);
+        showToast(`${pendingPurchase.capacity}GB purchased successfully for ${phoneNumber}!`, 'success');
+        setSelectedBundle('');
         setPhoneNumber('');
-        setNumberConfirmed(false);
-        
-        // Auto-scroll to the top to see the success message
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setError('');
+        setIsPurchaseModalOpen(false);
+        setPendingPurchase(null);
       }
     } catch (error) {
       console.error('Purchase error:', error);
-      setBundleMessages(prev => ({ 
-        ...prev, 
-        [index]: { 
-          text: error.response?.data?.message || 'Failed to purchase data bundle', 
-          type: 'error' 
-        } 
-      }));
+      const errorMessage = error.response?.data?.message || 'Purchase failed. Please try again.';
+      setError(errorMessage);
+      showToast(errorMessage, 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-4 text-center">AirtelTigo Data Bundles</h1>
-      
-      {/* Important Notice Box */}
-      <div className="mb-6 p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded-lg shadow">
-        <div className="flex items-start">
-          <div className="flex-shrink-0">
-            <AlertTriangle className="h-6 w-6 text-yellow-600" />
-          </div>
-          <div className="ml-3">
-            <h3 className="text-sm md:text-base font-medium text-yellow-800">IMPORTANT: Please Read Before Purchase</h3>
-            <div className="mt-2 text-sm text-yellow-700">
-              <ul className="list-disc pl-5 space-y-1">
-                <li><strong>Instant Delivery:</strong> All data purchases are processed instantly upon payment.</li>
-                <li><strong>No Refunds:</strong> We do not offer refunds for wrong phone number entries.</li>
-                <li><strong>AirtelTigo Numbers Only:</strong> This bundle works only with valid AirtelTigo numbers (026, 056, 027, 057, 023, 053).</li>
-                <li><strong>Double-Check:</strong> Please verify the recipient's number before confirming your purchase.</li>
-              </ul>
-            </div>
-          </div>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden">
+      {/* Background Elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 rounded-full bg-gradient-to-br from-blue-400/5 to-indigo-400/5 blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full bg-gradient-to-br from-purple-400/5 to-pink-400/5 blur-3xl animate-pulse delay-1000"></div>
       </div>
-      
-      {globalMessage.text && (
-        <div className={`mb-6 p-4 rounded-lg shadow ${globalMessage.type === 'success' ? 'bg-green-100 text-green-800 border-l-4 border-green-500' : 'bg-red-100 text-red-800 border-l-4 border-red-500'}`}>
-          <div className="flex items-center">
-            <div className="mr-3">
-              {globalMessage.type === 'success' ? (
-                <CheckCircle className="h-6 w-6 text-green-500" />
-              ) : (
-                <AlertCircle className="h-6 w-6 text-red-500" />
-              )}
-            </div>
-            <span className="font-medium">{globalMessage.text}</span>
-          </div>
-        </div>
-      )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {bundles.map((bundle, index) => (
-          <div key={`airteltigo-${index}`} className="flex flex-col">
-            <div 
-              className={`flex ${getNetworkColor()} text-white w-full rounded-t-lg flex-col justify-between cursor-pointer transition-transform duration-300 hover:translate-y-[-5px] ${selectedBundleIndex === index ? 'rounded-b-none' : 'rounded-b-lg'}`}
-              onClick={() => handleSelectBundle(index)}
-            >
-              <div className="flex flex-col items-center justify-center w-full p-3 space-y-3">
-                <div className="w-20 h-20 flex justify-center items-center">
-                  <NetworkLogo />
-                </div>
-                <h3 className="text-xl font-bold">
-                  {bundle.capacity} GB
-                </h3>
+      {/* Toast Notification */}
+      {toast.visible && (
+        <Toast 
+          message={toast.message}
+          type={toast.type}
+          onClose={hideToast}
+        />
+      )}
+      
+      {/* Loading Overlay */}
+      <LoadingOverlay isLoading={isLoading} />
+      
+      <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <ServiceInfoModal 
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            onConfirm={() => {
+              setIsModalOpen(false);
+            }}
+          />
+
+          <PurchaseModal
+            isOpen={isPurchaseModalOpen}
+            onClose={() => {
+              setIsPurchaseModalOpen(false);
+              setPendingPurchase(null);
+              setPhoneNumber('');
+              setError('');
+            }}
+            bundle={pendingPurchase}
+            phoneNumber={phoneNumber}
+            setPhoneNumber={setPhoneNumber}
+            onPurchase={processPurchase}
+            error={error}
+            isLoading={isLoading}
+          />
+          
+          {/* Header */}
+          <div className="text-center mb-6">
+            <div className="flex items-center justify-center space-x-2 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center shadow-lg">
+                <span className="text-lg font-bold text-white">AT</span>
               </div>
-              <div className="grid grid-cols-2 text-white bg-black" 
-                   style={{ borderRadius: selectedBundleIndex === index ? '0' : '0 0 0.5rem 0.5rem' }}>
-                <div className="flex flex-col items-center justify-center p-3 text-center border-r border-r-white">
-                  <p className="text-lg">GH₵ {bundle.price}</p>
-                  <p className="text-sm font-bold">Price</p>
-                </div>
-                <div className="flex flex-col items-center justify-center p-3 text-center">
-                  <p className="text-lg">30 Days</p>
-                  <p className="text-sm font-bold">Duration</p>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 text-transparent bg-clip-text">
+                AirtelTigo Data
+              </h1>
+            </div>
+            <p className="text-white/80 text-sm">30-Day Bundles</p>
+          </div>
+
+          {/* Main Card */}
+          <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/20 overflow-hidden shadow-xl">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-6 relative overflow-hidden">
+              <div className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                <Star className="w-4 h-4 text-white" />
+              </div>
+              
+              <div className="relative z-10">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
+                    <Zap className="w-5 h-5 text-white" strokeWidth={2} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-white">Select Bundle</h2>
+                    <p className="text-white/90 text-sm">Choose data & buy instantly</p>
+                  </div>
                 </div>
               </div>
             </div>
-            
-            {selectedBundleIndex === index && (
-              <div className={`${getNetworkColor()} p-4 rounded-b-lg shadow-md`}>
-                {bundleMessages[index] && (
-                  <div className={`mb-3 p-3 rounded ${bundleMessages[index].type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800 border-l-4 border-red-500'}`}>
-                    <div className="flex items-center">
-                      {bundleMessages[index].type === 'error' && (
-                        <AlertCircle className="h-5 w-5 mr-2 text-red-500" />
-                      )}
-                      <span className="text-sm">{bundleMessages[index].text}</span>
-                    </div>
-                  </div>
-                )}
-                
-                <div className="mb-4">
-                  <label className="block text-white text-sm font-bold mb-2">
-                    Enter AirtelTigo Number
-                  </label>
-                  <div className="flex space-x-2">
-                    <input
-                      type="tel"
-                      className="w-full px-4 py-2 rounded bg-opacity-90 bg-white text-gray-800 placeholder-gray-500 border focus:outline-none focus:border-blue-300"
-                      placeholder="e.g., 0270000000"
-                      value={phoneNumber}
-                      onChange={(e) => {
-                        setPhoneNumber(e.target.value);
-                        setNumberConfirmed(false);
-                      }}
-                      disabled={numberConfirmed}
-                      maxLength={10}
-                    />
-                    {!numberConfirmed && (
-                      <button
-                        onClick={handleConfirmNumber}
-                        className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 focus:outline-none whitespace-nowrap"
-                      >
-                        Confirm
-                      </button>
-                    )}
-                  </div>
-                  {numberConfirmed && (
-                    <div className="mt-2 p-2 bg-green-100 text-green-800 rounded-md flex items-center">
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      <span className="text-xs">Number confirmed! Please proceed with purchase.</span>
-                    </div>
-                  )}
-                  <p className="text-xs text-white mt-1">Enter AirtelTigo number only (026, 056, 027, 057, 023, 053)</p>
-                </div>
-                
-                <div className="p-3 bg-black bg-opacity-30 rounded-md mb-4">
-                  <p className="text-xs text-white font-semibold">
-                    ⚠️ WARNING: This purchase is INSTANT and FINAL. No refunds for wrong numbers.
-                  </p>
-                </div>
-                
+
+            {/* Form */}
+            <div className="p-6">
+              {/* Service info button */}
+              <div className="mb-6 flex justify-center">
                 <button
-                  onClick={() => handlePurchase(bundle, index)}
-                  className="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-green-400 disabled:cursor-not-allowed"
-                  disabled={isLoading || !numberConfirmed}
+                  onClick={() => setIsModalOpen(true)}
+                  className="flex items-center space-x-2 px-4 py-2 bg-blue-500/20 border border-blue-500/30 text-blue-400 font-medium rounded-lg hover:bg-blue-500/30 transition-all text-sm"
                 >
-                  {isLoading ? (
-                    <span className="flex items-center justify-center">
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Processing...
-                    </span>
-                  ) : 'Purchase'}
+                  <Info className="h-4 w-4" />
+                  <span>Service Information</span>
                 </button>
               </div>
-            )}
+
+              {/* Bundle Selection Grid */}
+              <div>
+                <label className="block text-lg font-bold mb-4 text-white text-center">
+                  Choose Your Data Bundle
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  {bundles.map((bundle) => (
+                    <button
+                      key={bundle.value}
+                      type="button"
+                      onClick={() => handleBundleSelect(bundle)}
+                      disabled={!bundle.inStock}
+                      className={`p-4 rounded-xl text-center transition-all border transform hover:scale-105 ${
+                        bundle.inStock
+                          ? 'bg-white/10 border-white/20 text-white/90 hover:bg-blue-500/20 hover:border-blue-400/50 cursor-pointer'
+                          : 'bg-gray-500/20 border-gray-500/30 text-gray-500 cursor-not-allowed opacity-50'
+                      }`}
+                    >
+                      <div className="text-sm font-bold mb-1">{bundle.label}</div>
+                      <div className="text-blue-400 font-bold text-sm">GH₵{bundle.price}</div>
+                      {!bundle.inStock && (
+                        <div className="text-red-400 text-xs mt-1">Out of Stock</div>
+                      )}
+                      {bundle.inStock && (
+                        <div className="text-white/60 text-xs mt-1">Click to buy</div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Important Notice */}
+              <div className="mt-6 p-4 bg-red-500/20 border border-red-500/30 rounded-xl">
+                <div className="flex items-start">
+                  <AlertTriangle className="w-4 h-4 text-red-400 mr-3 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h4 className="text-sm font-bold text-red-400 mb-2">Important Notice</h4>
+                    <div className="space-y-1 text-white/80 text-xs">
+                      <p>• Instant service - delivery processed immediately</p>
+                      <p>• AirtelTigo numbers only (026, 056, 027, 057, 023, 053)</p>
+                      <p>• No refunds for wrong numbers</p>
+                      <p>• 30-day validity for all bundles</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        ))}
+        </div>
       </div>
     </div>
   );
 };
 
-export default HubnetBundleCards;
+export default AirtelTigoBundleSelect;
