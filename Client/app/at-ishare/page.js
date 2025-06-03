@@ -1,7 +1,5 @@
 'use client'
 import React, { useState, useEffect } from 'react';
-// Note: In a real implementation, you would import axios or use fetch
-// const axios = { post: async () => ({ data: { status: 'success' } }) };
 import { Zap, Star, AlertTriangle, CheckCircle, X, Info, Shield, Phone, CreditCard, ArrowRight, Sparkles } from 'lucide-react';
 
 // Toast Notification Component
@@ -89,8 +87,8 @@ const PurchaseModal = ({ isOpen, onClose, bundle, phoneNumber, setPhoneNumber, o
               <span className="text-blue-400 font-bold">{bundle.capacity}GB</span>
             </div>
             <div className="flex justify-between items-center mb-2">
-              <span className="text-white font-medium">Duration:</span>
-              <span className="text-blue-400 font-bold">30 Days</span>
+              {/* <span className="text-white font-medium">Duration:</span>
+              <span className="text-blue-400 font-bold">30 Days</span> */}
             </div>
             <div className="flex justify-between items-center border-t border-white/20 pt-2">
               <span className="text-white font-bold">Total Price:</span>
@@ -107,68 +105,67 @@ const PurchaseModal = ({ isOpen, onClose, bundle, phoneNumber, setPhoneNumber, o
           )}
 
           {/* Phone Number Form */}
-          <div onSubmit={handleSubmit}>
-            <div className="mb-4">
-              <label className="block text-sm font-bold mb-2 text-white">
-                Enter AirtelTigo Phone Number
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Phone className="w-4 h-4 text-blue-400" />
-                </div>
-                <input
-                  type="tel"
-                  value={phoneNumber}
-                  onChange={handlePhoneNumberChange}
-                  className="pl-10 pr-4 py-3 block w-full rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder-white/50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
-                  placeholder="0XXXXXXXXX"
-                  required
-                  autoFocus
-                />
+          <div className="mb-4">
+            <label className="block text-sm font-bold mb-2 text-white">
+              Enter AirtelTigo Phone Number
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Phone className="w-4 h-4 text-blue-400" />
               </div>
-              <p className="mt-1 text-xs text-white/70">AirtelTigo numbers only (026, 056, 027, 057, 023, 053)</p>
+              <input
+                type="tel"
+                value={phoneNumber}
+                onChange={handlePhoneNumberChange}
+                className="pl-10 pr-4 py-3 block w-full rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder-white/50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
+                placeholder="0XXXXXXXXX"
+                required
+                autoFocus
+              />
             </div>
+            <p className="mt-1 text-xs text-white/70">AirtelTigo numbers only (026, 056, 027, 057, 023, 053)</p>
+          </div>
 
-            {/* Warning */}
-            <div className="mb-4 p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-xl">
-              <div className="flex items-start">
-                <AlertTriangle className="w-4 h-4 text-yellow-400 mr-2 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-yellow-200 text-xs">
-                    <strong>Important:</strong> Verify your number carefully. No refunds for wrong numbers.
-                  </p>
-                </div>
+          {/* Warning */}
+          <div className="mb-4 p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-xl">
+            <div className="flex items-start">
+              <AlertTriangle className="w-4 h-4 text-yellow-400 mr-2 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-yellow-200 text-xs">
+                  <strong>Important:</strong> Verify your number carefully. No refunds for wrong numbers.
+                </p>
               </div>
             </div>
+          </div>
 
-            {/* Action Buttons */}
-            <div className="flex space-x-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 py-3 px-4 bg-white/10 hover:bg-white/20 text-white font-medium rounded-xl transition-all border border-white/20"
-                disabled={isLoading}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isLoading || !phoneNumber || phoneNumber.length !== 10}
-                className="flex-1 py-3 px-4 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold rounded-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-              >
-                {isLoading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <CreditCard className="w-4 h-4 mr-2" />
-                    Purchase Now
-                  </>
-                )}
-              </button>
-            </div>
+          {/* Action Buttons */}
+          <div className="flex space-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-3 px-4 bg-white/10 hover:bg-white/20 text-white font-medium rounded-xl transition-all border border-white/20"
+              disabled={isLoading}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onPurchase}
+              disabled={isLoading || !phoneNumber || phoneNumber.length !== 10}
+              className="flex-1 py-3 px-4 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold rounded-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+            >
+              {isLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  Purchase Now
+                </>
+              )}
+            </button>
           </div>
         </div>
       </div>
@@ -423,34 +420,37 @@ const AirtelTigoBundleSelect = () => {
     setError('');
 
     try {
-      // Note: In a real implementation, you would use axios or fetch
-      // const token = localStorage.getItem('authToken');
-      // const response = await axios.post('https://datahustle.onrender.com/api/v1/purchase-hubnet-data', {
-      //   userId: userData.id,
-      //   phoneNumber: phoneNumber,
-      //   network: pendingPurchase.network,
-      //   dataAmountGB: pendingPurchase.capacity, 
-      //   price: parseFloat(pendingPurchase.price)
-      // }, {
-      //   headers: {
-      //     'Authorization': `Bearer ${token}`
-      //   }
-      // });
+      const token = localStorage.getItem('authToken');
+      const response = await fetch('https://datahustle.onrender.com/api/v1/purchase-hubnet-data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          userId: userData.id,
+          phoneNumber: phoneNumber,
+          network: pendingPurchase.network,
+          dataAmountGB: pendingPurchase.capacity, 
+          price: parseFloat(pendingPurchase.price)
+        })
+      });
 
-      // Simulate successful response for demo
-      const response = { data: { status: 'success' } };
+      const data = await response.json();
 
-      if (response.data.status === 'success') {
+      if (response.ok && data.status === 'success') {
         showToast(`${pendingPurchase.capacity}GB purchased successfully for ${phoneNumber}!`, 'success');
         setSelectedBundle('');
         setPhoneNumber('');
         setError('');
         setIsPurchaseModalOpen(false);
         setPendingPurchase(null);
+      } else {
+        throw new Error(data.message || 'Purchase failed');
       }
     } catch (error) {
       console.error('Purchase error:', error);
-      const errorMessage = error.response?.data?.message || 'Purchase failed. Please try again.';
+      const errorMessage = error.message || 'Purchase failed. Please try again.';
       setError(errorMessage);
       showToast(errorMessage, 'error');
     } finally {
