@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Package, Database, DollarSign, TrendingUp, Calendar, AlertCircle, PlusCircle, User, BarChart2, ChevronDown, ChevronUp, Clock, Eye, Globe, Zap, Activity, Sparkles, ArrowUpRight, Star, Target, Flame, Award, Shield } from 'lucide-react';
+import { CreditCard, Package, Database, DollarSign, TrendingUp, Calendar, AlertCircle, PlusCircle,X, User, BarChart2, ChevronDown, ChevronUp, Clock, Eye, Globe, Zap, Activity, Sparkles, ArrowUpRight, Star, Target, Flame, Award, Shield, Info, Timer, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AnimatedCounter, CurrencyCounter } from './Animation'; // Adjust the import path as necessary
 import DailySalesChart from '@/app/week/page';
@@ -23,6 +23,8 @@ const DashboardPage = () => {
   const [showSalesChart, setShowSalesChart] = useState(false);
   // Add state for sales chart time period
   const [salesPeriod, setSalesPeriod] = useState('7d');
+  // Add state for notice visibility
+  const [showNotice, setShowNotice] = useState(true);
 
   const ViewAll = () => {
     router.push('/orders');
@@ -72,6 +74,12 @@ const DashboardPage = () => {
     const userData = JSON.parse(userDataString);
     setUserName(userData.name || 'User');
     fetchDashboardData(userData.id);
+    
+    // Check if user has dismissed the notice before
+    const noticeDismissed = localStorage.getItem('dataDeliveryNoticeDismissed');
+    if (noticeDismissed === 'true') {
+      setShowNotice(false);
+    }
   }, [router]);
 
   // Fetch dashboard data from API
@@ -174,6 +182,12 @@ const DashboardPage = () => {
     setSalesPeriod(period);
   };
 
+  // Dismiss notice handler
+  const dismissNotice = () => {
+    setShowNotice(false);
+    localStorage.setItem('dataDeliveryNoticeDismissed', 'true');
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
@@ -214,6 +228,73 @@ const DashboardPage = () => {
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-4">
+        {/* Data Delivery Notice - Important Information */}
+        {showNotice && (
+          <div className="mb-6 animate-fadeInDown">
+            <div className="bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-amber-500/20 backdrop-blur-xl rounded-2xl p-4 border border-amber-500/30 relative overflow-hidden">
+              {/* Background Pattern */}
+              <div className="absolute inset-0 bg-amber-500/5"></div>
+              
+              <div className="relative z-10">
+                <div className="flex items-start space-x-4">
+                  <div className="flex-shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/20 backdrop-blur-sm flex items-center justify-center border border-amber-500/30">
+                      <Timer className="w-5 h-5 text-amber-300" strokeWidth={2.5} />
+                    </div>
+                  </div>
+                  
+                  <div className="flex-grow">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2">
+                        <h3 className="text-lg font-bold text-white flex items-center space-x-2">
+                          <Info className="w-5 h-5 text-amber-300" />
+                          <span>Important: Service Information</span>
+                        </h3>
+                        
+                        <div className="space-y-3">
+                          <div className="space-y-2">
+                            <p className="text-white/90 text-sm leading-relaxed">
+                              Please note that <span className="font-semibold text-amber-300">data bundles are not delivered instantly</span>. 
+                            </p>
+                            
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <Timer className="w-5 h-5 text-amber-300" />
+                                  <span className="text-sm font-semibold text-white">Delivery Time</span>
+                                </div>
+                                <p className="text-amber-300 text-lg font-bold">5 minutes - 4 hour</p>
+                                <p className="text-white/70 text-xs mt-1">Depending on network conditions</p>
+                              </div>
+                              
+                              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <Clock className="w-5 h-5 text-emerald-300" />
+                                  <span className="text-sm font-semibold text-white">Business Hours</span>
+                                </div>
+                                <p className="text-emerald-300 text-lg font-bold">8:00 AM - 9:00 PM</p>
+                                <p className="text-white/70 text-xs mt-1">Orders placed outside hours will be processed next day</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <button
+                        onClick={dismissNotice}
+                        className="ml-4 text-white/60 hover:text-white transition-colors"
+                        aria-label="Dismiss notice"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Hero Section - Compact Design */}
         <div className="mb-6">
           <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 rounded-2xl p-6 relative overflow-hidden shadow-xl">
@@ -516,6 +597,24 @@ const DashboardPage = () => {
           ))}
         </div>
       </div>
+
+      {/* Add fadeInDown animation */}
+      <style jsx>{`
+        @keyframes fadeInDown {
+          from {
+            opacity: 0;
+            transform: translateY(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        .animate-fadeInDown {
+          animation: fadeInDown 0.5s ease-out;
+        }
+      `}</style>
     </div>
   );
 };
