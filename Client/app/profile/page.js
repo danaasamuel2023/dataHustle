@@ -1,8 +1,5 @@
-// pages/user-stats.js
-'use client'
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import axios from 'axios';
 import { 
   User, 
   CreditCard, 
@@ -22,7 +19,12 @@ import {
   Sun,
   Activity,
   Target,
-  Star
+  Star,
+  ArrowUp,
+  DollarSign,
+  BarChart3,
+  Zap,
+  Sparkles
 } from 'lucide-react';
 
 const UserStatsPage = () => {
@@ -122,19 +124,21 @@ const UserStatsPage = () => {
       const userId = userData.id;
       
       // Using GET request with userId in URL params
-      const response = await axios.get(`https://datahustle.onrender.com/api/v1/user-stats/${userId}`, {
+      const response = await fetch(`https://datahustle.onrender.com/api/v1/user-stats/${userId}`, {
         headers: {
           'Authorization': `Bearer ${authToken}`
         }
       });
       
-      if (response.data.success) {
-        setUserStats(response.data.data);
+      const data = await response.json();
+      
+      if (data.success) {
+        setUserStats(data.data);
       } else {
         setError('Failed to fetch user statistics');
       }
     } catch (err) {
-      if (err.response && err.response.status === 401) {
+      if (err.message && err.message.includes('401')) {
         // Handle token expiration
         setError('Your session has expired. Please log in again.');
         localStorage.removeItem('authToken');
@@ -163,30 +167,16 @@ const UserStatsPage = () => {
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
 
-  // Get status color and style
-  const getStatusStyle = (status) => {
-    switch (status) {
-      case 'approved':
-        return 'bg-gradient-to-r from-emerald-50 to-emerald-100 dark:from-emerald-900/30 dark:to-emerald-800/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700';
-      case 'pending':
-        return 'bg-gradient-to-r from-amber-50 to-amber-100 dark:from-amber-900/30 dark:to-amber-800/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700';
-      case 'rejected':
-        return 'bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/30 dark:to-red-800/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-700';
-      default:
-        return 'bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800/30 dark:to-slate-700/30 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600';
-    }
-  };
-
   // Show loading spinner if data is still loading
   if (!userData || !authToken || loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+      <div className="flex justify-center items-center min-h-screen bg-gradient-to-b from-gray-900 via-purple-900 to-violet-900">
         <div className="text-center">
           <div className="relative">
-            <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 dark:border-blue-800"></div>
-            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-600 dark:border-blue-400 absolute top-0 left-0"></div>
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-purple-200/20"></div>
+            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-purple-400 absolute top-0 left-0"></div>
           </div>
-          <p className="mt-4 text-slate-600 dark:text-slate-300 font-medium">Loading your statistics...</p>
+          <p className="mt-4 text-purple-200 font-medium">Loading your statistics...</p>
         </div>
       </div>
     );
@@ -195,18 +185,18 @@ const UserStatsPage = () => {
   // Show error message if there was an error
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 p-6">
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900 to-violet-900 p-6">
         <div className="max-w-2xl mx-auto mt-20">
-          <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 dark:border-slate-700/30 p-8">
+          <div className="bg-gray-800/50 backdrop-blur-xl rounded-3xl shadow-2xl border border-purple-500/20 p-8">
             <div className="text-center">
-              <div className="mx-auto w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-6">
-                <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
+              <div className="mx-auto w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-6">
+                <AlertCircle className="w-8 h-8 text-red-400" />
               </div>
-              <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-3">Oops! Something went wrong</h2>
-              <p className="text-slate-600 dark:text-slate-300 mb-8">{error}</p>
+              <h2 className="text-2xl font-bold text-white mb-3">Oops! Something went wrong</h2>
+              <p className="text-gray-300 mb-8">{error}</p>
               <button
                 onClick={() => window.location.reload()}
-                className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 dark:from-blue-500 dark:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-0.5"
+                className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-0.5"
               >
                 <RefreshCw className="w-5 h-5 mr-2" />
                 Try Again
@@ -219,223 +209,200 @@ const UserStatsPage = () => {
   }
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 transition-all duration-300">
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900 to-violet-900 transition-all duration-300">
       <div className="max-w-7xl mx-auto p-4 md:p-8">
         {/* Header Section */}
-        <div className="relative overflow-hidden bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 dark:border-slate-700/30 p-8 mb-8">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-indigo-600/5 dark:from-blue-400/5 dark:to-indigo-400/5"></div>
+        <div className="relative overflow-hidden bg-gradient-to-r from-purple-800/30 to-pink-800/30 backdrop-blur-xl rounded-3xl shadow-2xl border border-purple-500/20 p-8 mb-8">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 via-pink-600/10 to-blue-600/10 animate-gradient-x"></div>
           <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between">
             <div className="mb-6 lg:mb-0">
               <div className="flex items-center mb-3">
-                <div className="w-3 h-3 bg-emerald-400 rounded-full mr-3 animate-pulse"></div>
-                <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Live Dashboard</span>
+                <Sparkles className="w-5 h-5 text-yellow-400 mr-2 animate-pulse" />
+                <span className="text-sm font-medium text-yellow-400 uppercase tracking-wider">Analytics Hub</span>
               </div>
-              <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 dark:from-slate-100 dark:to-slate-300 bg-clip-text text-transparent">
-                Account Overview
+              <h1 className="text-4xl lg:text-5xl font-black text-white mb-2">
+                Performance Center
               </h1>
-              <p className="text-slate-600 dark:text-slate-300 mt-2 text-lg">Track your performance and activity metrics</p>
+              <p className="text-purple-200 text-lg">Real-time insights at your fingertips</p>
             </div>
             <div className="flex items-center space-x-4">
               <button
                 onClick={toggleDarkMode}
-                className="flex items-center justify-center w-12 h-12 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-600 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                className="flex items-center justify-center w-12 h-12 bg-white/10 backdrop-blur-sm text-white rounded-2xl hover:bg-white/20 transition-all duration-200 border border-white/10"
                 aria-label="Toggle dark mode"
               >
                 {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>
               <button
                 onClick={fetchUserStats}
-                className="flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 dark:from-blue-500 dark:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-0.5"
+                className="flex items-center px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-0.5"
               >
                 <RefreshCw className="w-5 h-5 mr-2" />
-                Refresh Data
+                Sync Data
               </button>
             </div>
           </div>
         </div>
         
-        {/* User Profile Card */}
-        <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 dark:border-slate-700/30 p-8 mb-8">
-          <div className="flex flex-col md:flex-row md:items-start md:space-x-8">
-            {/* Profile Avatar & Info */}
-            <div className="flex items-center mb-6 md:mb-0">
+        {/* User Profile Card - New Design */}
+        <div className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 backdrop-blur-xl rounded-3xl shadow-2xl border border-purple-500/20 p-8 mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Profile Section */}
+            <div className="lg:col-span-1">
               <div className="relative">
-                <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-                  <User className="w-10 h-10 text-white" />
+                <div className="w-32 h-32 mx-auto lg:mx-0 bg-gradient-to-br from-cyan-400 via-purple-500 to-pink-500 rounded-3xl flex items-center justify-center shadow-2xl transform hover:scale-105 transition-transform">
+                  <User className="w-16 h-16 text-white" />
                 </div>
-                <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full border-2 border-white dark:border-slate-800 flex items-center justify-center">
-                  <CheckCircle className="w-3 h-3 text-white" />
+                <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-green-500 rounded-full border-4 border-gray-800 flex items-center justify-center">
+                  <Zap className="w-5 h-5 text-white" />
                 </div>
               </div>
-              <div className="ml-6">
-                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">{userStats.userInfo.name}</h2>
-                <div className="flex items-center text-slate-600 dark:text-slate-300 mt-1">
-                  <Mail className="w-4 h-4 mr-2" />
-                  <span className="text-sm">{userStats.userInfo.email}</span>
-                </div>
-                <div className="flex items-center text-slate-600 dark:text-slate-300 mt-1">
-                  <Phone className="w-4 h-4 mr-2" />
-                  <span className="text-sm">{userStats.userInfo.phoneNumber}</span>
+              <div className="mt-6 text-center lg:text-left">
+                <h2 className="text-3xl font-black text-white mb-2">{userStats.userInfo.name}</h2>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-center lg:justify-start text-purple-300">
+                    <Mail className="w-4 h-4 mr-2" />
+                    <span className="text-sm">{userStats.userInfo.email}</span>
+                  </div>
+                  <div className="flex items-center justify-center lg:justify-start text-purple-300">
+                    <Phone className="w-4 h-4 mr-2" />
+                    <span className="text-sm">{userStats.userInfo.phoneNumber}</span>
+                  </div>
                 </div>
               </div>
             </div>
             
-            {/* Quick Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1">
-              {/* Account Status */}
-              <div className="group">
-                <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700/50 dark:to-slate-600/50 rounded-xl p-5 border border-slate-200/50 dark:border-slate-600/30 hover:shadow-lg transition-all duration-200">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
-                      <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                    </div>
+            {/* Stats Cards */}
+            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Wallet Balance Card */}
+              <div className="group relative overflow-hidden bg-gradient-to-br from-green-600/20 to-emerald-600/20 rounded-2xl p-6 border border-green-500/30 hover:border-green-400/50 transition-all">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/10 rounded-full blur-3xl group-hover:bg-green-400/20 transition-all"></div>
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-4">
+                    <Wallet className="w-8 h-8 text-green-400" />
+                    <ArrowUp className="w-5 h-5 text-green-400" />
                   </div>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-2">Account Status</p>
-                  <div className={`px-3 py-1.5 rounded-lg text-sm font-semibold inline-block capitalize ${getStatusStyle(userStats.userInfo.accountStatus)}`}>
-                    {userStats.userInfo.accountStatus}
-                  </div>
+                  <p className="text-green-300 text-sm font-medium mb-1">Current Balance</p>
+                  <p className="text-3xl font-black text-white">{formatCurrency(userStats.userInfo.walletBalance)}</p>
                 </div>
               </div>
               
-              {/* Wallet Balance */}
-              <div className="group">
-                <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700/50 dark:to-slate-600/50 rounded-xl p-5 border border-slate-200/50 dark:border-slate-600/30 hover:shadow-lg transition-all duration-200">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-                      <Wallet className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                    </div>
+              {/* Member Duration Card */}
+              <div className="group relative overflow-hidden bg-gradient-to-br from-blue-600/20 to-cyan-600/20 rounded-2xl p-6 border border-blue-500/30 hover:border-blue-400/50 transition-all">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl group-hover:bg-blue-400/20 transition-all"></div>
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-4">
+                    <Calendar className="w-8 h-8 text-blue-400" />
+                    <Star className="w-5 h-5 text-yellow-400" />
                   </div>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-2">Wallet Balance</p>
-                  <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{formatCurrency(userStats.userInfo.walletBalance)}</p>
+                  <p className="text-blue-300 text-sm font-medium mb-1">Membership Duration</p>
+                  <p className="text-3xl font-black text-white">{userStats.userInfo.accountAge} days</p>
+                  <p className="text-xs text-blue-300/70 mt-1">Since {formatDate(userStats.userInfo.registrationDate)}</p>
                 </div>
               </div>
               
-              {/* Account Age */}
-              <div className="group">
-                <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700/50 dark:to-slate-600/50 rounded-xl p-5 border border-slate-200/50 dark:border-slate-600/30 hover:shadow-lg transition-all duration-200">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
-                      <Calendar className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              {/* Total Deposits Card */}
+              <div className="group relative overflow-hidden bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-2xl p-6 border border-purple-500/30 hover:border-purple-400/50 transition-all">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl group-hover:bg-purple-400/20 transition-all"></div>
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-4">
+                    <DollarSign className="w-8 h-8 text-purple-400" />
+                    <TrendingUp className="w-5 h-5 text-purple-400" />
+                  </div>
+                  <p className="text-purple-300 text-sm font-medium mb-1">Total Deposited</p>
+                  <p className="text-3xl font-black text-white">{formatCurrency(userStats.depositStats.totalAmount)}</p>
+                  <p className="text-xs text-purple-300/70 mt-1">{userStats.depositStats.numberOfDeposits} transactions</p>
+                </div>
+              </div>
+              
+              {/* Success Rate Card */}
+              <div className="group relative overflow-hidden bg-gradient-to-br from-yellow-600/20 to-orange-600/20 rounded-2xl p-6 border border-yellow-500/30 hover:border-yellow-400/50 transition-all">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/10 rounded-full blur-3xl group-hover:bg-yellow-400/20 transition-all"></div>
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-4">
+                    <Award className="w-8 h-8 text-yellow-400" />
+                    <BarChart3 className="w-5 h-5 text-yellow-400" />
+                  </div>
+                  <p className="text-yellow-300 text-sm font-medium mb-1">Success Rate</p>
+                  <p className="text-3xl font-black text-white">{userStats.orderStats.successRate}%</p>
+                  <div className="mt-3">
+                    <div className="bg-gray-700/50 h-2 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-gradient-to-r from-yellow-400 to-orange-400 h-full rounded-full transition-all duration-1000" 
+                        style={{ width: `${userStats.orderStats.successRate}%` }}
+                      ></div>
                     </div>
                   </div>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-2">Member Since</p>
-                  <p className="text-xl font-bold text-slate-800 dark:text-slate-100">{userStats.userInfo.accountAge} days</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{formatDate(userStats.userInfo.registrationDate)}</p>
                 </div>
               </div>
             </div>
           </div>
         </div>
         
-        {/* Statistics Grid */}
+        {/* Order Statistics Section - New Design */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* Deposit Statistics */}
-          <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 dark:border-slate-700/30 p-8">
-            <div className="flex items-center mb-8">
-              <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
-                <CreditCard className="w-7 h-7 text-white" />
+          {/* Orders Overview */}
+          <div className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 backdrop-blur-xl rounded-3xl shadow-2xl border border-purple-500/20 p-8">
+            <div className="flex items-center mb-6">
+              <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mr-4">
+                <ShoppingCart className="w-6 h-6 text-white" />
               </div>
-              <div>
-                <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Deposit Activity</h3>
-                <p className="text-slate-600 dark:text-slate-300 text-sm">Your funding history</p>
-              </div>
+              <h3 className="text-2xl font-black text-white">Order Analytics</h3>
             </div>
             
-            <div className="space-y-6">
-              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-xl p-6 border border-emerald-200/50 dark:border-emerald-700/30">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-emerald-700 dark:text-emerald-300 text-sm font-semibold mb-1">Total Deposited</p>
-                    <p className="text-3xl font-bold text-emerald-800 dark:text-emerald-200">{formatCurrency(userStats.depositStats.totalAmount)}</p>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-gray-700/30 rounded-2xl border border-gray-600/30">
+                <div className="flex items-center">
+                  <div className="w-10 h-10 bg-indigo-500/20 rounded-xl flex items-center justify-center mr-3">
+                    <Target className="w-5 h-5 text-indigo-400" />
                   </div>
-                  <div className="w-12 h-12 bg-emerald-200 dark:bg-emerald-800 rounded-lg flex items-center justify-center">
-                    <TrendingUp className="w-6 h-6 text-emerald-700 dark:text-emerald-300" />
+                  <div>
+                    <p className="text-gray-400 text-sm">Total Orders</p>
+                    <p className="text-xl font-bold text-white">{userStats.orderStats.totalOrders}</p>
                   </div>
                 </div>
               </div>
               
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-6 border border-blue-200/50 dark:border-blue-700/30">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-blue-700 dark:text-blue-300 text-sm font-semibold mb-1">Total Transactions</p>
-                    <p className="text-3xl font-bold text-blue-800 dark:text-blue-200">{userStats.depositStats.numberOfDeposits}</p>
+              <div className="flex items-center justify-between p-4 bg-gray-700/30 rounded-2xl border border-gray-600/30">
+                <div className="flex items-center">
+                  <div className="w-10 h-10 bg-green-500/20 rounded-xl flex items-center justify-center mr-3">
+                    <CheckCircle className="w-5 h-5 text-green-400" />
                   </div>
-                  <div className="w-12 h-12 bg-blue-200 dark:bg-blue-800 rounded-lg flex items-center justify-center">
-                    <Activity className="w-6 h-6 text-blue-700 dark:text-blue-300" />
+                  <div>
+                    <p className="text-gray-400 text-sm">Successful Orders</p>
+                    <p className="text-xl font-bold text-white">{userStats.orderStats.successfulOrders}</p>
                   </div>
                 </div>
               </div>
             </div>
           </div>
           
-          {/* Order Statistics */}
-          <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 dark:border-slate-700/30 p-8">
-            <div className="flex items-center mb-8">
-              <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
-                <ShoppingCart className="w-7 h-7 text-white" />
+          {/* Activity Summary */}
+          <div className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 backdrop-blur-xl rounded-3xl shadow-2xl border border-purple-500/20 p-8">
+            <div className="flex items-center mb-6">
+              <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-600 rounded-2xl flex items-center justify-center mr-4">
+                <Activity className="w-6 h-6 text-white" />
               </div>
-              <div>
-                <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Order Performance</h3>
-                <p className="text-slate-600 dark:text-slate-300 text-sm">Your purchase statistics</p>
-              </div>
+              <h3 className="text-2xl font-black text-white">Activity Summary</h3>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700/50 dark:to-slate-600/50 rounded-xl p-5 border border-slate-200/50 dark:border-slate-600/30">
+            <div className="space-y-4">
+              <div className="p-4 bg-gradient-to-r from-pink-600/10 to-rose-600/10 rounded-2xl border border-pink-500/20">
                 <div className="flex items-center justify-between mb-3">
-                  <div className="w-10 h-10 bg-slate-200 dark:bg-slate-600 rounded-lg flex items-center justify-center">
-                    <Target className="w-5 h-5 text-slate-600 dark:text-slate-300" />
-                  </div>
+                  <span className="text-pink-300 text-sm font-medium">Performance Score</span>
+                  <span className="text-2xl font-bold text-white">{Math.round((userStats.orderStats.successRate + (userStats.orderStats.totalOrders / 10)) / 2)}%</span>
                 </div>
-                <p className="text-slate-600 dark:text-slate-400 text-sm font-medium mb-1">Total Orders</p>
-                <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{userStats.orderStats.totalOrders}</p>
+                <div className="text-xs text-gray-400">Based on success rate and order volume</div>
               </div>
               
-              <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/30 dark:to-emerald-800/30 rounded-xl p-5 border border-emerald-200/50 dark:border-emerald-700/30">
+              <div className="p-4 bg-gradient-to-r from-cyan-600/10 to-blue-600/10 rounded-2xl border border-cyan-500/20">
                 <div className="flex items-center justify-between mb-3">
-                  <div className="w-10 h-10 bg-emerald-200 dark:bg-emerald-700 rounded-lg flex items-center justify-center">
-                    <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-300" />
-                  </div>
-                </div>
-                <p className="text-emerald-700 dark:text-emerald-300 text-sm font-medium mb-1">Successful</p>
-                <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-200">{userStats.orderStats.successfulOrders}</p>
-              </div>
-              
-              <div className="md:col-span-2">
-                <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl p-6 border border-purple-200/50 dark:border-purple-700/30">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-purple-700 dark:text-purple-300 text-sm font-semibold mb-2">Success Rate</p>
-                      <div className="flex items-center">
-                        <span className="text-3xl font-bold text-purple-800 dark:text-purple-200 mr-2">{userStats.orderStats.successRate}%</span>
-                        <Star className="w-6 h-6 text-yellow-500" />
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="w-16 h-16 relative">
-                        <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 64 64">
-                          <circle
-                            cx="32"
-                            cy="32"
-                            r="28"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                            fill="none"
-                            className="text-purple-200 dark:text-purple-800"
-                          />
-                          <circle
-                            cx="32"
-                            cy="32"
-                            r="28"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                            fill="none"
-                            strokeDasharray={`${(userStats.orderStats.successRate / 100) * 175.93} 175.93`}
-                            className="text-purple-600 dark:text-purple-400"
-                          />
-                        </svg>
-                      </div>
-                    </div>
+                  <span className="text-cyan-300 text-sm font-medium">Engagement Level</span>
+                  <div className="flex items-center">
+                    <span className="text-xl font-bold text-white mr-2">
+                      {userStats.orderStats.totalOrders > 50 ? 'High' : userStats.orderStats.totalOrders > 20 ? 'Medium' : 'Growing'}
+                    </span>
+                    <Activity className={`w-5 h-5 ${userStats.orderStats.totalOrders > 50 ? 'text-green-400' : userStats.orderStats.totalOrders > 20 ? 'text-yellow-400' : 'text-blue-400'}`} />
                   </div>
                 </div>
               </div>
@@ -443,71 +410,101 @@ const UserStatsPage = () => {
           </div>
         </div>
         
-        {/* Admin-only Ranking Section */}
+        {/* Admin-only Ranking Section - New Design */}
         {isAdmin && userStats.ranking && (
-          <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 dark:border-slate-700/30 p-8">
+          <div className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 backdrop-blur-xl rounded-3xl shadow-2xl border border-purple-500/20 p-8">
             <div className="flex items-center mb-8">
-              <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
-                <Award className="w-7 h-7 text-white" />
+              <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-amber-600 rounded-2xl flex items-center justify-center mr-4">
+                <Award className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">User Rankings</h3>
-                <p className="text-slate-600 dark:text-slate-300 text-sm">Admin view: Community standings</p>
+                <h3 className="text-2xl font-black text-white">Leaderboard Position</h3>
+                <p className="text-purple-300 text-sm">Administrator view</p>
               </div>
             </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="text-center">
                 <div className="relative inline-block mb-6">
-                  <div className="w-24 h-24 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl flex items-center justify-center shadow-xl">
-                    <Award className="w-12 h-12 text-white" />
+                  <div className="w-32 h-32 bg-gradient-to-br from-yellow-400 via-amber-500 to-orange-600 rounded-3xl flex items-center justify-center shadow-2xl transform hover:scale-105 transition-transform">
+                    <span className="text-4xl font-black text-white">#{userStats.ranking.position}</span>
                   </div>
-                  <div className="absolute -top-2 -right-2 w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                    #{userStats.ranking.position}
+                  <div className="absolute -top-3 -right-3 px-3 py-1 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full text-white text-sm font-bold">
+                    Top {userStats.ranking.percentile}%
                   </div>
                 </div>
-                <p className="text-slate-600 dark:text-slate-400 text-sm font-medium mb-2">Current Position</p>
-                <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">#{userStats.ranking.position} of {userStats.ranking.outOf}</p>
+                <p className="text-gray-400 text-sm mb-2">Global Ranking</p>
+                <p className="text-2xl font-bold text-white">Position {userStats.ranking.position} of {userStats.ranking.outOf}</p>
               </div>
               
               <div className="lg:col-span-2 space-y-6">
-                <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl p-6 border border-purple-200/50 dark:border-purple-700/30">
-                  <h4 className="text-purple-800 dark:text-purple-200 font-semibold mb-4">Percentile Ranking</h4>
+                <div className="p-6 bg-gradient-to-r from-amber-600/10 to-orange-600/10 rounded-2xl border border-amber-500/20">
+                  <h4 className="text-amber-300 font-bold mb-4">Performance Percentile</h4>
                   <div className="relative">
-                    <div className="bg-purple-200 dark:bg-purple-800 h-3 rounded-full overflow-hidden">
+                    <div className="bg-gray-700 h-4 rounded-full overflow-hidden">
                       <div 
-                        className="bg-gradient-to-r from-purple-500 to-pink-500 h-full rounded-full transition-all duration-1000 ease-out" 
+                        className="bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-600 h-full rounded-full transition-all duration-1000 ease-out relative overflow-hidden" 
                         style={{ width: `${userStats.ranking.percentile}%` }}
-                      ></div>
+                      >
+                        <div className="absolute inset-0 bg-white/20 animate-shimmer"></div>
+                      </div>
                     </div>
                     <div className="flex justify-between mt-3 text-sm">
-                      <span className="text-purple-700 dark:text-purple-300 font-medium">Top {userStats.ranking.percentile}%</span>
-                      <span className="text-slate-600 dark:text-slate-300">Better than {100 - userStats.ranking.percentile}% of users</span>
+                      <span className="text-amber-300 font-bold">Top {userStats.ranking.percentile}%</span>
+                      <span className="text-gray-400">Outperforming {100 - userStats.ranking.percentile}% of users</span>
                     </div>
                   </div>
                 </div>
                 
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-6 border border-blue-200/50 dark:border-blue-700/30">
-                  <h4 className="text-blue-800 dark:text-blue-200 font-semibold mb-3">Performance Insights</h4>
-                  <p className="text-blue-700 dark:text-blue-300 text-sm leading-relaxed">
+                <div className="p-6 bg-gradient-to-r from-purple-600/10 to-pink-600/10 rounded-2xl border border-purple-500/20">
+                  <h4 className="text-purple-300 font-bold mb-3 flex items-center">
+                    <Sparkles className="w-5 h-5 mr-2" />
+                    Performance Analysis
+                  </h4>
+                  <p className="text-gray-300 text-sm leading-relaxed">
                     {userStats.ranking.position <= 10 ? (
-                      "🏆 Outstanding performance! This user is among our top performers and significantly contributes to platform growth."
+                      "🏆 Elite performer! This user demonstrates exceptional engagement and drives significant value to the platform."
                     ) : userStats.ranking.position <= 50 ? (
-                      "⭐ Excellent user engagement. This member shows consistent activity and good platform utilization."
+                      "⭐ Top-tier user with strong activity patterns. Consistent performance places them well above average."
                     ) : (
-                      "📈 Growing user with potential. Encouraging more activity could improve their ranking and engagement."
+                      "📈 Active participant showing growth potential. Continued engagement will improve their standing."
                     )}
                   </p>
-                  <div className="mt-4 flex items-center text-sm text-blue-600 dark:text-blue-400">
-                    <TrendingUp className="w-4 h-4 mr-2" />
-                    <span className="font-medium">Admin Analytics: Track user progression patterns</span>
-                  </div>
                 </div>
               </div>
             </div>
           </div>
         )}
       </div>
+      
+      <style jsx>{`
+        @keyframes gradient-x {
+          0%, 100% {
+            transform: translateX(0%);
+          }
+          50% {
+            transform: translateX(-100%);
+          }
+        }
+        
+        @keyframes shimmer {
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(100%);
+          }
+        }
+        
+        .animate-gradient-x {
+          animation: gradient-x 15s ease infinite;
+          background-size: 200% 200%;
+        }
+        
+        .animate-shimmer {
+          animation: shimmer 2s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 };
