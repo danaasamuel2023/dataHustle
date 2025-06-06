@@ -68,7 +68,7 @@ router.post('/deposit', async (req, res) => {
         amount: paystackAmount, // Convert to pesewas (smallest currency unit for GHS)
         currency: 'GHS',
         reference,
-        callback_url: `https://www.datamartgh.shop/payment/callback?reference=${reference}`
+        callback_url: `https://www.datahustle.shop/payment/callback?reference=${reference}`
       },
       {
         headers: {
