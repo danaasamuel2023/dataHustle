@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Package, Database, DollarSign, TrendingUp, Calendar, AlertCircle, PlusCircle,X, User, BarChart2, ChevronDown, ChevronUp, Clock, Eye, Globe, Zap, Activity, Sparkles, ArrowUpRight, Star, Target, Flame, Award, Shield, Info, Timer, CheckCircle } from 'lucide-react';
+import { CreditCard, Package, Database, DollarSign, TrendingUp, Calendar,X, AlertCircle, PlusCircle, User, BarChart2, ChevronDown, ChevronUp, Clock, Eye, Globe, Zap, Activity, Sparkles, ArrowUpRight, Star, Target, Flame, Award, Shield, Info, Timer, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AnimatedCounter, CurrencyCounter } from './Animation'; // Adjust the import path as necessary
 import DailySalesChart from '@/app/week/page';
@@ -273,7 +273,11 @@ const DashboardPage = () => {
                                   <span className="text-sm font-semibold text-white">Business Hours</span>
                                 </div>
                                 <p className="text-emerald-300 text-lg font-bold">8:00 AM - 9:00 PM</p>
-                                <p className="text-white/70 text-xs mt-1">Orders placed outside hours will be processed next day</p>
+                                <div className="space-y-1 mt-2">
+                                  <p className="text-white/80 text-xs">• Orders within hours: Processed same day</p>
+                                  <p className="text-white/80 text-xs">• Orders after 9 PM: Processed next morning</p>
+                                  <p className="text-white/70 text-xs">• We process orders 7 days a week</p>
+                                </div>
                               </div>
                             </div>
                           </div>
