@@ -303,7 +303,7 @@ const MTNBundleSelect = () => {
     { value: '100', label: '100GB', capacity: '100', price: '407.00', network: 'YELLO', inStock: false }
   ];
 
-  // Get user data from localStorage on component mount
+  // Get user data from localStorage on component mount`
   useEffect(() => {
     const storedUserData = localStorage.getItem('userData');
     if (storedUserData) {
