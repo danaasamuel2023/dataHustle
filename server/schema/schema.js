@@ -105,7 +105,7 @@ const TransactionSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['deposit', 'withdrawal', 'transfer', 'refund','purchase'],
+    enum: ['deposit', 'withdrawal', 'transfer', 'refund','purchase','admin-deduction'],
     required: true
   },
   amount: {
@@ -124,7 +124,7 @@ const TransactionSchema = new mongoose.Schema({
   },
   gateway: {
     type: String,
-    enum: ['paystack', 'manual', 'system','wallet','admin-deposit'],
+    enum: ['paystack', 'manual', 'system','wallet','admin-deposit','admin-deduction'],
     default: 'paystack'
   },
   // Add the new processing field to prevent double processing
