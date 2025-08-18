@@ -93,7 +93,7 @@ const PurchaseModal = ({ isOpen, onClose, bundle, phoneNumber, setPhoneNumber, o
             </div>
             <div className="flex justify-between items-center border-t border-white/20 pt-2">
               <span className="text-white font-bold">Total Price:</span>
-              <span className="text-emerald-400 font-bold text-lg">₵{bundle.price}</span>
+              <span className="text-emerald-400 font-bold text-lg">GH₵{bundle.price}</span>
             </div>
           </div>
 
@@ -174,6 +174,7 @@ const PurchaseModal = ({ isOpen, onClose, bundle, phoneNumber, setPhoneNumber, o
     </div>
   );
 };
+
 const ServiceInfoModal = ({ isOpen, onClose, onConfirm }) => {
   if (!isOpen) return null;
   
@@ -285,9 +286,10 @@ const MTNBundleSelect = () => {
   // Manual inventory control
   const inventoryAvailable = true;
   
+  // Updated bundles with correct backend prices
   const bundles = [
-    { value: '1', label: '1GB', capacity: '1', price: '4.60', network: 'YELLO', inStock: inventoryAvailable },
-    { value: '2', label: '2GB', capacity: '2', price: '9.30', network: 'YELLO', inStock: inventoryAvailable },
+    { value: '1', label: '1GB', capacity: '1', price: '4.50', network: 'YELLO', inStock: inventoryAvailable },
+    { value: '2', label: '2GB', capacity: '2', price: '9.20', network: 'YELLO', inStock: inventoryAvailable },
     { value: '3', label: '3GB', capacity: '3', price: '13.50', network: 'YELLO', inStock: inventoryAvailable },
     { value: '4', label: '4GB', capacity: '4', price: '18.50', network: 'YELLO', inStock: inventoryAvailable },
     { value: '5', label: '5GB', capacity: '5', price: '23.50', network: 'YELLO', inStock: inventoryAvailable },
@@ -300,10 +302,10 @@ const MTNBundleSelect = () => {
     { value: '30', label: '30GB', capacity: '30', price: '129.00', network: 'YELLO', inStock: inventoryAvailable },
     { value: '40', label: '40GB', capacity: '40', price: '166.00', network: 'YELLO', inStock: inventoryAvailable },
     { value: '50', label: '50GB', capacity: '50', price: '207.00', network: 'YELLO', inStock: inventoryAvailable },
-    { value: '100', label: '100GB', capacity: '100', price: '407.00', network: 'YELLO', inStock: false }
+    { value: '100', label: '100GB', capacity: '100', price: '407.00', network: 'YELLO', inStock: inventoryAvailable }
   ];
 
-  // Get user data from localStorage on component mount`
+  // Get user data from localStorage on component mount
   useEffect(() => {
     const storedUserData = localStorage.getItem('userData');
     if (storedUserData) {
@@ -426,7 +428,7 @@ const MTNBundleSelect = () => {
         userId: userData.id,
         phoneNumber: phoneNumber,
         network: pendingPurchase.network,
-        capacity: pendingPurchase.capacity, 
+        capacity: parseInt(pendingPurchase.capacity), // Make sure it's an integer
         price: parseFloat(pendingPurchase.price)
       }, {
         headers: {
@@ -564,7 +566,7 @@ const MTNBundleSelect = () => {
                       }`}
                     >
                       <div className="text-sm font-bold mb-1">{bundle.label}</div>
-                      <div className="text-emerald-400 font-bold text-sm">₵{bundle.price}</div>
+                      <div className="text-emerald-400 font-bold text-sm">GH₵{bundle.price}</div>
                       {!bundle.inStock && (
                         <div className="text-red-400 text-xs mt-1">Out of Stock</div>
                       )}
