@@ -3,7 +3,7 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
-const { User, DataPurchase, Transaction,DataInventory} = require('../schema/schema');
+const { User, DataPurchase, Transaction, DataInventory } = require('../schema/schema');
 
 // Geonettech API Configuration
 const GEONETTECH_BASE_URL = 'https://testhub.geonettech.site/api/v1';
@@ -18,11 +18,349 @@ const geonetClient = axios.create({
   }
 });
 
+// Telecel API Configuration
+const TELECEL_API_URL = 'https://iget.onrender.com/api/developer/orders/place';
+const TELECEL_API_KEY = '76013fa9c8bf774ac7fb35db5e586fb7852a618cbf57b9ddb072fc2c465e5fe8';
+
 // Enhanced logging function
 const logOperation = (operation, data) => {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] [${operation}]`, JSON.stringify(data, null, 2));
 };
+
+// ===== OFFICIAL PRICING STRUCTURES =====
+const OFFICIAL_PRICING = {
+  'YELLO': { // MTN pricing structure
+    '1': 4.50,
+    '2': 9.20,
+    '3': 13.50,
+    '4': 18.50,
+    '5': 23.50,
+    '6': 27.00,
+    '8': 35.50,
+    '10': 43.50,
+    '15': 62.50,
+    '20': 83.00,
+    '25': 105.00,
+    '30': 129.00,
+    '40': 166.00,
+    '50': 207.00,
+    '100': 407.00
+  },
+  'at': { // AirtelTigo pricing structure
+    '1': 3.95,
+    '2': 8.35,
+    '3': 13.25,
+    '4': 16.50,
+    '5': 19.50,
+    '6': 23.50,
+    '8': 30.50,
+    '10': 38.50,
+    '12': 45.50,
+    '15': 57.50,
+    '25': 95.00,
+    '30': 115.00,
+    '40': 151.00,
+    '50': 190.00
+  },
+  'AT_PREMIUM': { // AirtelTigo Premium pricing structure (same as regular AT)
+    '1': 3.95,
+    '2': 8.35,
+    '3': 13.25,
+    '4': 16.50,
+    '5': 19.50,
+    '6': 23.50,
+    '8': 30.50,
+    '10': 38.50,
+    '12': 45.50,
+    '15': 57.50,
+    '25': 95.00,
+    '30': 115.00,
+    '40': 151.00,
+    '50': 190.00
+  },
+  'TELECEL': { // Telecel pricing structure
+    '5': 19.50,
+    '8': 34.64,
+    '10': 36.50,
+    '12': 43.70,
+    '15': 52.85,
+    '20': 69.80,
+    '25': 86.75,
+    '30': 103.70,
+    '35': 120.65,
+    '40': 137.60,
+    '45': 154.55,
+    '50': 171.50,
+    '100': 341.00
+  }
+};
+
+// ===== PRICE VALIDATION FUNCTION =====
+const validatePrice = (network, capacity, submittedPrice, userId, phoneNumber) => {
+  const capacityStr = capacity.toString();
+  
+  if (!OFFICIAL_PRICING[network]) {
+    logOperation('PRICE_VALIDATION_INVALID_NETWORK', {
+      network,
+      availableNetworks: Object.keys(OFFICIAL_PRICING),
+      userId
+    });
+    return {
+      isValid: false,
+      message: 'Invalid network selected',
+      code: 'INVALID_NETWORK'
+    };
+  }
+
+  const officialPrice = OFFICIAL_PRICING[network][capacityStr];
+  
+  if (officialPrice === undefined) {
+    logOperation('PRICE_VALIDATION_INVALID_CAPACITY', {
+      network,
+      capacity: capacityStr,
+      availableCapacities: Object.keys(OFFICIAL_PRICING[network]),
+      userId
+    });
+    return {
+      isValid: false,
+      message: `Invalid data capacity for ${network}. Available options: ${Object.keys(OFFICIAL_PRICING[network]).join(', ')}GB`,
+      code: 'INVALID_CAPACITY'
+    };
+  }
+
+  const submittedPriceFloat = parseFloat(submittedPrice);
+  const tolerance = 0.01;
+  
+  if (Math.abs(submittedPriceFloat - officialPrice) > tolerance) {
+    logOperation('PRICE_VALIDATION_MISMATCH', {
+      network,
+      capacity: capacityStr,
+      submittedPrice: submittedPriceFloat,
+      officialPrice,
+      difference: Math.abs(submittedPriceFloat - officialPrice),
+      userId,
+      phoneNumber: phoneNumber.substring(0, 3) + 'XXXXXXX'
+    });
+    return {
+      isValid: false,
+      message: 'Invalid price. Please refresh the page and try again.',
+      code: 'PRICE_MISMATCH'
+    };
+  }
+
+  logOperation('PRICE_VALIDATION_SUCCESS', {
+    network,
+    capacity: capacityStr,
+    validatedPrice: officialPrice,
+    submittedPrice: submittedPriceFloat,
+    userId
+  });
+
+  return {
+    isValid: true,
+    validatedPrice: officialPrice,
+    message: 'Price validation successful'
+  };
+};
+
+// ===== PHONE NUMBER VALIDATION FUNCTION =====
+const validatePhoneNumber = (network, phoneNumber) => {
+  const cleanNumber = phoneNumber.replace(/[\s-]/g, '');
+  
+  switch (network) {
+    case 'YELLO': // MTN validation
+      const mtnPrefixes = ['024', '054', '055', '059', '026', '025', '053', '027', '057', '023', '020', '050'];
+      if (cleanNumber.length === 10 && cleanNumber.startsWith('0')) {
+        const prefix = cleanNumber.substring(0, 3);
+        if (mtnPrefixes.includes(prefix)) {
+          return { isValid: true, message: '' };
+        } else {
+          return { isValid: false, message: 'Please enter a valid MTN number' };
+        }
+      } else {
+        return { isValid: false, message: 'Please enter a valid 10-digit MTN number starting with 0' };
+      }
+      
+    case 'at': // AirtelTigo validation
+    case 'AT_PREMIUM': // AirtelTigo Premium uses same prefixes
+      const airtelTigoPrefixes = ['026', '056', '027', '057', '023', '053'];
+      if (cleanNumber.length === 10 && cleanNumber.startsWith('0')) {
+        const prefix = cleanNumber.substring(0, 3);
+        if (airtelTigoPrefixes.includes(prefix)) {
+          return { isValid: true, message: '' };
+        } else {
+          return { isValid: false, message: 'Please enter a valid AirtelTigo number (026, 056, 027, 057, 023, 053)' };
+        }
+      } else {
+        return { isValid: false, message: 'Please enter a valid 10-digit AirtelTigo number' };
+      }
+      
+    case 'TELECEL': // Telecel validation
+      const telecelPrefixes = ['020', '050'];
+      if (cleanNumber.length === 10 && cleanNumber.startsWith('0')) {
+        const prefix = cleanNumber.substring(0, 3);
+        if (telecelPrefixes.includes(prefix)) {
+          return { isValid: true, message: '' };
+        } else {
+          return { isValid: false, message: 'Please enter a valid Telecel number (020, 050)' };
+        }
+      } else {
+        return { isValid: false, message: 'Please enter a valid 10-digit Telecel number' };
+      }
+      
+    default:
+      return { isValid: false, message: 'Unsupported network' };
+  }
+};
+
+// Generate mixed reference function
+function generateMixedReference(prefix = '') {
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const numbers = '0123456789';
+  
+  let reference = prefix;
+  
+  // Add 2 random letters
+  for (let i = 0; i < 2; i++) {
+    reference += letters.charAt(Math.floor(Math.random() * letters.length));
+  }
+  
+  // Add 4 random numbers
+  for (let i = 0; i < 4; i++) {
+    reference += numbers.charAt(Math.floor(Math.random() * numbers.length));
+  }
+  
+  // Add 2 more random letters
+  for (let i = 0; i < 2; i++) {
+    reference += letters.charAt(Math.floor(Math.random() * letters.length));
+  }
+  
+  return reference;
+}
+
+// Helper function for Telecel API integration
+async function processTelecelOrder(recipient, capacity, reference) {
+  try {
+    const capacityInMB = capacity >= 1 && capacity < 1000 ? capacity * 1000 : capacity;
+    
+    logOperation('TELECEL_ORDER_REQUEST_PREPARED', {
+      recipient,
+      capacityGB: capacity,
+      capacityMB: capacityInMB,
+      reference
+    });
+    
+    const telecelPayload = {
+      recipientNumber: recipient,
+      capacity: capacity,
+      bundleType: "Telecel-5959",
+      reference: reference,
+    };
+    
+    logOperation('TELECEL_ORDER_REQUEST', telecelPayload);
+    
+    const response = await axios.post(
+      TELECEL_API_URL,
+      telecelPayload,
+      { 
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-API-Key': TELECEL_API_KEY
+        } 
+      }
+    );
+    
+    logOperation('TELECEL_ORDER_RESPONSE', {
+      status: response.status,
+      data: response.data,
+      fullResponse: JSON.stringify(response.data, null, 2)
+    });
+    
+    // Extract the Telecel order reference from the response
+    let telecelOrderReference = null;
+    
+    if (response.data?.data?.order?.orderReference) {
+      telecelOrderReference = response.data.data.order.orderReference;
+    } else if (response.data?.data?.orderReference) {
+      telecelOrderReference = response.data.data.orderReference;
+    } else if (response.data?.orderReference) {
+      telecelOrderReference = response.data.orderReference;
+    } else if (response.data?.data?.reference) {
+      telecelOrderReference = response.data.data.reference;
+    } else if (response.data?.reference) {
+      telecelOrderReference = response.data.reference;
+    } else if (response.data?.data?.order?.id) {
+      telecelOrderReference = response.data.data.order.id;
+    } else if (response.data?.data?.id) {
+      telecelOrderReference = response.data.data.id;
+    }
+    
+    logOperation('TELECEL_ORDER_REFERENCE_EXTRACTED', {
+      telecelOrderReference,
+      originalReference: reference
+    });
+    
+    return {
+      success: true,
+      data: response.data,
+      orderId: telecelOrderReference || reference,
+      telecelReference: telecelOrderReference
+    };
+  } catch (error) {
+    logOperation('TELECEL_ORDER_ERROR', {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data
+    });
+    
+    return {
+      success: false,
+      error: {
+        message: error.message,
+        details: error.response?.data || 'No response details available'
+      }
+    };
+  }
+}
+
+// Function to check Telecel order status
+async function checkTelecelOrderStatus(reference) {
+  try {
+    logOperation('TELECEL_STATUS_CHECK_REQUEST', { reference });
+    
+    const response = await axios.get(
+      `https://iget.onrender.com/api/developer/orders/reference/${reference}`,
+      { 
+        headers: { 
+          'X-API-Key': TELECEL_API_KEY
+        } 
+      }
+    );
+    
+    logOperation('TELECEL_STATUS_CHECK_RESPONSE', response.data);
+    
+    return {
+      success: true,
+      data: response.data.data,
+      status: response.data.data?.order?.status || 'processing'
+    };
+  } catch (error) {
+    logOperation('TELECEL_STATUS_CHECK_ERROR', {
+      message: error.message,
+      response: error.response ? error.response.data : null
+    });
+    
+    return {
+      success: false,
+      error: {
+        message: error.message,
+        details: error.response?.data || 'No response details available'
+      }
+    };
+  }
+}
 
 // Check Agent Wallet Balance
 router.get('/agent-balance', async (req, res) => {
@@ -57,116 +395,7 @@ router.get('/agent-balance', async (req, res) => {
   }
 });
 
-// Purchase Data Bundle with Inventory Check
-const TELECEL_API_URL = 'https://iget.onrender.com/api/developer/orders/place';
-const TELECEL_API_KEY = '76013fa9c8bf774ac7fb35db5e586fb7852a618cbf57b9ddb072fc2c465e5fe8';
-
-// Helper function for Telecel API integration - can be placed at the top of your router file
-async function processTelecelOrder(recipient, capacity, reference) {
-  try {
-    // Convert GB to MB if needed (assuming capacity might be in GB)
-    const capacityInMB = capacity >= 1 && capacity < 1000 ? capacity * 1000 : capacity;
-    
-    logOperation('TELECEL_ORDER_REQUEST_PREPARED', {
-      recipient,
-      capacityGB: capacity,
-      capacityMB: capacityInMB,
-      reference
-    });
-    
-    // Format payload for Telecel API 
-    const telecelPayload = {
-      recipientNumber: recipient,
-      capacity: capacity, // Use GB for Telecel API
-      bundleType: "Telecel-5959", // Specific bundle type required for Telecel
-      reference: reference,
-    };
-    
-    logOperation('TELECEL_ORDER_REQUEST', telecelPayload);
-    
-    // Call Telecel API to process the order
-    const response = await axios.post(
-      TELECEL_API_URL,
-      telecelPayload,
-      { 
-        headers: { 
-          'Content-Type': 'application/json',
-          'X-API-Key': TELECEL_API_KEY
-        } 
-      }
-    );
-    
-    logOperation('TELECEL_ORDER_RESPONSE', response.data);
-    
-    return {
-      success: true,
-      data: response.data,
-      orderId: response.data.orderReference || response.data.transactionId || response.data.id || reference
-    };
-  } catch (error) {
-    logOperation('TELECEL_ORDER_ERROR', {
-      message: error.message,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data
-    });
-    
-    return {
-      success: false,
-      error: {
-        message: error.message,
-        details: error.response?.data || 'No response details available'
-      }
-    };
-  }
-}
-
-// Function to check Telecel order status
-async function checkTelecelOrderStatus(reference) {
-  try {
-    logOperation('TELECEL_STATUS_CHECK_REQUEST', {
-      reference
-    });
-    
-    const response = await axios.get(
-      `${TELECEL_API_URL}/orders/reference/${reference}`,
-      { 
-        headers: { 
-          'X-API-Key': TELECEL_API_KEY
-        } 
-      }
-    );
-    
-    logOperation('TELECEL_STATUS_CHECK_RESPONSE', response.data);
-    
-    return {
-      success: true,
-      data: response.data.data,
-      status: response.data.data?.order?.status || 'processing'
-    };
-  } catch (error) {
-    logOperation('TELECEL_STATUS_CHECK_ERROR', {
-      message: error.message,
-      response: error.response ? error.response.data : null
-    });
-    
-    return {
-      success: false,
-      error: {
-        message: error.message,
-        details: error.response?.data || 'No response details available'
-      }
-    };
-  }
-}
-
-// Modify the purchase-data route to include Telecel API handling
-// Modified purchase-data route to remove phone number verification check and GB verification fee
-
-// Modified purchase-data route with simplified error handling
-// Modified purchase-data route with direct error handling
-// Complete updated purchase-data route with clean error handling
-// Updated purchase-data route with skipGeonettech integration
+// ===== MAIN PURCHASE DATA ROUTE WITH IMPROVED TELECEL AND AT_PREMIUM INTEGRATION =====
 router.post('/purchase-data', async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -182,7 +411,7 @@ router.post('/purchase-data', async (req, res) => {
 
     logOperation('DATA_PURCHASE_REQUEST', {
       userId,
-      phoneNumber,
+      phoneNumber: phoneNumber?.substring(0, 3) + 'XXXXXXX',
       network,
       capacity,
       price,
@@ -210,6 +439,37 @@ router.post('/purchase-data', async (req, res) => {
       });
     }
 
+    // ===== PRICE VALIDATION =====
+    const priceValidation = validatePrice(network, capacity, price, userId, phoneNumber);
+    if (!priceValidation.isValid) {
+      await session.abortTransaction();
+      session.endSession();
+      
+      return res.status(400).json({
+        status: 'error',
+        message: priceValidation.message,
+        code: priceValidation.code
+      });
+    }
+
+    // ===== PHONE NUMBER VALIDATION =====
+    const phoneValidation = validatePhoneNumber(network, phoneNumber);
+    if (!phoneValidation.isValid) {
+      logOperation('PHONE_VALIDATION_FAILED', {
+        network,
+        phoneNumber: phoneNumber.substring(0, 3) + 'XXXXXXX',
+        validationMessage: phoneValidation.message
+      });
+      
+      await session.abortTransaction();
+      session.endSession();
+      
+      return res.status(400).json({
+        status: 'error',
+        message: phoneValidation.message
+      });
+    }
+
     // Find user
     const user = await User.findById(userId).session(session);
     if (!user) {
@@ -224,13 +484,15 @@ router.post('/purchase-data', async (req, res) => {
       });
     }
 
+    const validatedPrice = priceValidation.validatedPrice;
+
     // Check user wallet balance
-    if (user.walletBalance < price) {
+    if (user.walletBalance < validatedPrice) {
       logOperation('DATA_PURCHASE_INSUFFICIENT_BALANCE', {
         userId,
         walletBalance: user.walletBalance,
-        requiredAmount: price,
-        shortfall: price - user.walletBalance
+        requiredAmount: validatedPrice,
+        shortfall: validatedPrice - user.walletBalance
       });
       
       await session.abortTransaction();
@@ -240,22 +502,22 @@ router.post('/purchase-data', async (req, res) => {
         status: 'error',
         message: 'Insufficient wallet balance',
         currentBalance: user.walletBalance,
-        requiredAmount: price
+        requiredAmount: validatedPrice
       });
     }
 
-    // Get the inventory record (we'll use it to check both inStock and skipGeonettech)
+    // Get the inventory record
     const inventory = await DataInventory.findOne({ network }).session(session);
     
     logOperation('DATA_INVENTORY_CHECK', {
       network,
       inventoryFound: !!inventory,
-      inStock: inventory ? inventory.inStock : false,
+      inStock: inventory ? inventory.inStock : true,
       skipGeonettech: inventory ? inventory.skipGeonettech : false
     });
     
-    // If inventory doesn't exist or inStock is false, return error immediately
-    if (!inventory || !inventory.inStock) {
+    // Check if in stock
+    if (inventory && !inventory.inStock) {
       logOperation('DATA_INVENTORY_OUT_OF_STOCK', {
         network,
         inventoryExists: !!inventory
@@ -272,139 +534,150 @@ router.post('/purchase-data', async (req, res) => {
     
     // Generate unique references
     const transactionReference = `TRX-${uuidv4()}`;
-    const orderReference = Math.floor(1000 + Math.random() * 900000).toString();
+    
+    // Determine order reference prefix based on network and processing method
+    let orderReferencePrefix = '';
+    // Note: AT_PREMIUM always uses Geonettech, never skip
+    const shouldSkipGeonet = inventory?.skipGeonettech && network !== 'TELECEL' && network !== 'AT_PREMIUM';
+    
+    if (network === 'TELECEL') {
+      // For Telecel, check if we're using Geonettech or Telecel API
+      if (inventory?.skipGeonettech) {
+        orderReferencePrefix = 'TC-'; // Direct Telecel API prefix
+      } else {
+        orderReferencePrefix = 'GN-TC-'; // Geonettech Telecel prefix
+      }
+    } else if (network === 'AT_PREMIUM') {
+      orderReferencePrefix = 'ATP-'; // Special prefix for AT_PREMIUM
+    } else if (shouldSkipGeonet) {
+      orderReferencePrefix = 'MN-'; // Manual processing prefix
+    } else {
+      orderReferencePrefix = 'GN-'; // General Geonettech prefix
+    }
+    
+    let orderReference = generateMixedReference(orderReferencePrefix);
+    const originalInternalReference = orderReference;
 
     // PROCESSING SECTION
     let orderResponse = null;
     let apiOrderId = null;
-    let orderStatus = 'completed'; // Default status
-    
-    // Check if we should skip Geonettech API (from inventory state)
-    const shouldSkipGeonet = inventory.skipGeonettech && (network !== 'TELECEL');
+    let orderStatus = 'completed';
+    let processingMethod = 'api';
     
     logOperation('API_PROCESSING_DECISION', {
       network,
-      skipGeonettech: inventory.skipGeonettech,
+      skipGeonettech: inventory?.skipGeonettech,
       shouldSkipGeonet,
-      reason: shouldSkipGeonet 
-        ? 'Geonettech API disabled for this network' 
-        : 'Normal API processing'
+      orderReference,
+      prefix: orderReferencePrefix,
+      isATPremium: network === 'AT_PREMIUM',
+      isTelecel: network === 'TELECEL'
     });
     
     if (network === 'TELECEL') {
-      // Always use Telecel API for Telecel network (never skip)
-      logOperation('USING_TELECEL_API', {
-        network,
-        phoneNumber,
-        capacity,
-        orderReference
-      });
-      
-      // Try to process the Telecel order
-      try {
-        const telecelResponse = await processTelecelOrder(phoneNumber, capacity, orderReference);
+      // Check if we should use Geonettech or Telecel API
+      if (inventory?.skipGeonettech) {
+        // Use Telecel API directly
+        processingMethod = 'telecel_api';
+        logOperation('USING_TELECEL_API', {
+          network,
+          phoneNumber: phoneNumber.substring(0, 3) + 'XXXXXXX',
+          capacity,
+          orderReference
+        });
         
-        // If the API call failed, abort the transaction and return error
-        if (!telecelResponse.success) {
-          logOperation('TELECEL_API_ERROR', {
-            error: telecelResponse.error,
+        try {
+          const telecelResponse = await processTelecelOrder(phoneNumber, capacity, orderReference);
+          
+          if (!telecelResponse.success) {
+            logOperation('TELECEL_API_ERROR', {
+              error: telecelResponse.error,
+              orderReference
+            });
+            
+            await session.abortTransaction();
+            session.endSession();
+            
+            let errorMessage = 'Could not complete your purchase. Please try again later.';
+            
+            if (telecelResponse.error && telecelResponse.error.message) {
+              errorMessage = telecelResponse.error.message;
+            }
+            
+            if (telecelResponse.error && telecelResponse.error.details && 
+                typeof telecelResponse.error.details === 'object' && 
+                telecelResponse.error.details.message) {
+              errorMessage = telecelResponse.error.details.message;
+            }
+            
+            return res.status(400).json({
+              status: 'error',
+              message: errorMessage
+            });
+          }
+          
+          orderResponse = telecelResponse.data;
+          orderStatus = 'completed';
+          
+          if (telecelResponse.telecelReference) {
+            apiOrderId = telecelResponse.telecelReference;
+            orderReference = telecelResponse.telecelReference;
+            
+            logOperation('TELECEL_REFERENCE_UPDATE', {
+              originalReference: originalInternalReference,
+              telecelReference: telecelResponse.telecelReference,
+              finalReference: orderReference
+            });
+          } else {
+            apiOrderId = orderReference;
+            logOperation('TELECEL_NO_REFERENCE_RETURNED', {
+              usingOriginalReference: orderReference
+            });
+          }
+          
+          logOperation('TELECEL_ORDER_SUCCESS', {
+            orderId: apiOrderId,
+            orderReference: orderReference,
+            telecelReference: telecelResponse.telecelReference,
+            originalInternalReference: originalInternalReference,
+            processingMethod
+          });
+        } catch (telecelError) {
+          logOperation('TELECEL_API_EXCEPTION', {
+            error: telecelError.message,
+            stack: telecelError.stack,
             orderReference
           });
           
           await session.abortTransaction();
           session.endSession();
           
-          // Extract the exact error message from Telecel if available
-          let errorMessage = 'Could not complete your purchase. Please try again later.';
-          
-          if (telecelResponse.error && telecelResponse.error.message) {
-            errorMessage = telecelResponse.error.message;
-          }
-          
-          if (telecelResponse.error && telecelResponse.error.details && 
-              typeof telecelResponse.error.details === 'object' && 
-              telecelResponse.error.details.message) {
-            errorMessage = telecelResponse.error.details.message;
-          }
-          
           return res.status(400).json({
             status: 'error',
-            message: errorMessage
+            message: 'Unable to process your order. Please try again later.'
           });
         }
-        
-        // If we got here, the API call succeeded
-        orderResponse = telecelResponse.data;
-        orderStatus = 'completed';
-        
-        // Extract order ID if available
-        if (telecelResponse.data && 
-            telecelResponse.data.data && 
-            telecelResponse.data.data.order && 
-            telecelResponse.data.data.order.orderReference) {
-          apiOrderId = telecelResponse.data.data.order.orderReference;
-        } else {
-          apiOrderId = telecelResponse.orderId || orderReference;
-        }
-        
-        logOperation('TELECEL_ORDER_SUCCESS', {
-          orderId: apiOrderId,
-          orderReference
-        });
-      } catch (telecelError) {
-        logOperation('TELECEL_API_EXCEPTION', {
-          error: telecelError.message,
-          stack: telecelError.stack,
-          orderReference
-        });
-        
-        await session.abortTransaction();
-        session.endSession();
-        
-        return res.status(400).json({
-          status: 'error',
-          message: 'Unable to process your order. Please try again later.'
-        });
-      }
-    } else if (shouldSkipGeonet) {
-      // Skip Geonettech API - store as pending
-      logOperation('SKIPPING_GEONETTECH_API', {
-        network,
-        phoneNumber,
-        capacity,
-        orderReference,
-        reason: 'Geonettech API disabled for this network'
-      });
-      
-      orderStatus = 'pending';
-      apiOrderId = orderReference;
-      orderResponse = {
-        status: 'pending',
-        message: 'Order stored as pending - Geonettech API disabled',
-        reference: orderReference,
-        skipReason: 'API disabled for network'
-      };
-    } else {
-      // For all other networks, use Geonettech API normally
-      try {
-        // Place order with Geonettech
-        const geonetOrderPayload = {
-          network_key: network,
-          ref: orderReference,
-          recipient: phoneNumber,
-          capacity: capacity
-        };
-        
-        logOperation('GEONETTECH_ORDER_REQUEST', geonetOrderPayload);
-        
-        // Place order but don't suppress errors
+      } else {
+        // Use Geonettech API for Telecel
+        processingMethod = 'geonettech_api';
         try {
+          const geonetOrderPayload = {
+            network_key: 'TELECEL',
+            ref: orderReference,
+            recipient: phoneNumber,
+            capacity: capacity
+          };
+          
+          logOperation('GEONETTECH_TELECEL_ORDER_REQUEST', {
+            ...geonetOrderPayload,
+            processingMethod
+          });
+          
           const geonetResponse = await geonetClient.post('/placeOrder', geonetOrderPayload);
           orderResponse = geonetResponse.data;
           
-          // Check if the response indicates success
           if (!orderResponse || !orderResponse.status || orderResponse.status !== 'success') {
-            logOperation('GEONETTECH_API_UNSUCCESSFUL_RESPONSE', {
+            logOperation('GEONETTECH_TELECEL_API_UNSUCCESSFUL_RESPONSE', {
               response: orderResponse,
               orderReference
             });
@@ -412,10 +685,8 @@ router.post('/purchase-data', async (req, res) => {
             await session.abortTransaction();
             session.endSession();
             
-            // Extract the message but don't expose API details
             let errorMessage = 'Could not complete your purchase. Please try again later.';
             
-            // If there's a specific message from the API, parse it to make it user-friendly
             if (orderResponse && orderResponse.message) {
               const msg = orderResponse.message.toLowerCase();
               
@@ -424,7 +695,6 @@ router.post('/purchase-data', async (req, res) => {
               } else if (msg.includes('invalid') || msg.includes('phone')) {
                 errorMessage = 'The phone number you entered appears to be invalid. Please check and try again.';
               } else {
-                // Pass the original message directly if it's user-friendly
                 errorMessage = orderResponse.message;
               }
             }
@@ -438,13 +708,14 @@ router.post('/purchase-data', async (req, res) => {
           apiOrderId = orderResponse.data ? orderResponse.data.orderId : orderReference;
           orderStatus = 'completed';
           
-          logOperation('GEONETTECH_ORDER_SUCCESS', {
+          logOperation('GEONETTECH_TELECEL_ORDER_SUCCESS', {
             orderId: apiOrderId,
+            orderReference,
+            processingMethod,
             responseData: orderResponse
           });
         } catch (apiError) {
-          // Log the error and abort transaction
-          logOperation('GEONETTECH_API_ERROR', {
+          logOperation('GEONETTECH_TELECEL_API_ERROR', {
             error: apiError.message,
             response: apiError.response ? apiError.response.data : null,
             orderReference
@@ -453,10 +724,8 @@ router.post('/purchase-data', async (req, res) => {
           await session.abortTransaction();
           session.endSession();
           
-          // Just pass through the exact error message from the API without any modification
           let errorMessage = 'Could not complete your purchase. Please try again later.';
           
-          // If there's a specific message from the API, use it directly
           if (apiError.response && apiError.response.data && apiError.response.data.message) {
             errorMessage = apiError.response.data.message;
           }
@@ -466,35 +735,197 @@ router.post('/purchase-data', async (req, res) => {
             message: errorMessage
           });
         }
-      } catch (error) {
-        // Log any other error and abort transaction
-        logOperation('GENERAL_ERROR', {
-          error: error.message,
+      }
+    } else if (network === 'AT_PREMIUM') {
+      // AT_PREMIUM always uses Geonettech API
+      processingMethod = 'geonettech_api';
+      try {
+        const geonetOrderPayload = {
+          network_key: 'AT_PREMIUM', // Use AT_PREMIUM as the network key
+          ref: orderReference,
+          recipient: phoneNumber,
+          capacity: capacity
+        };
+        
+        logOperation('GEONETTECH_AT_PREMIUM_ORDER_REQUEST', {
+          ...geonetOrderPayload,
+          processingMethod
+        });
+        
+        const geonetResponse = await geonetClient.post('/placeOrder', geonetOrderPayload);
+        orderResponse = geonetResponse.data;
+        
+        if (!orderResponse || !orderResponse.status || orderResponse.status !== 'success') {
+          logOperation('GEONETTECH_AT_PREMIUM_API_UNSUCCESSFUL_RESPONSE', {
+            response: orderResponse,
+            orderReference
+          });
+          
+          await session.abortTransaction();
+          session.endSession();
+          
+          let errorMessage = 'Could not complete your purchase. Please try again later.';
+          
+          if (orderResponse && orderResponse.message) {
+            const msg = orderResponse.message.toLowerCase();
+            
+            if (msg.includes('duplicate') || msg.includes('within 5 minutes')) {
+              errorMessage = 'A similar order was recently placed. Please wait a few minutes before trying again.';
+            } else if (msg.includes('invalid') || msg.includes('phone')) {
+              errorMessage = 'The phone number you entered appears to be invalid. Please check and try again.';
+            } else {
+              errorMessage = orderResponse.message;
+            }
+          }
+          
+          return res.status(400).json({
+            status: 'error',
+            message: errorMessage
+          });
+        }
+        
+        apiOrderId = orderResponse.data ? orderResponse.data.orderId : orderReference;
+        orderStatus = 'completed';
+        
+        logOperation('GEONETTECH_AT_PREMIUM_ORDER_SUCCESS', {
+          orderId: apiOrderId,
+          orderReference,
+          processingMethod,
+          responseData: orderResponse
+        });
+      } catch (apiError) {
+        logOperation('GEONETTECH_AT_PREMIUM_API_ERROR', {
+          error: apiError.message,
+          response: apiError.response ? apiError.response.data : null,
           orderReference
         });
         
         await session.abortTransaction();
         session.endSession();
         
-        return res.status(500).json({
+        let errorMessage = 'Could not complete your purchase. Please try again later.';
+        
+        if (apiError.response && apiError.response.data && apiError.response.data.message) {
+          errorMessage = apiError.response.data.message;
+        }
+        
+        return res.status(400).json({
           status: 'error',
-          message: 'An unexpected error occurred. Please try again later.'
+          message: errorMessage
+        });
+      }
+    } else if (shouldSkipGeonet) {
+      // Skip Geonettech API - store as pending
+      processingMethod = 'manual';
+      logOperation('SKIPPING_GEONETTECH_API', {
+        network,
+        phoneNumber: phoneNumber.substring(0, 3) + 'XXXXXXX',
+        capacity,
+        orderReference,
+        processingMethod
+      });
+      
+      orderStatus = 'pending';
+      apiOrderId = orderReference;
+      orderResponse = {
+        status: 'pending',
+        message: 'Order stored for manual processing',
+        reference: orderReference,
+        processingMethod: 'manual',
+        skipReason: 'API disabled for network'
+      };
+    } else {
+      // Use Geonettech API for other networks (YELLO, at)
+      processingMethod = 'geonettech_api';
+      try {
+        const geonetOrderPayload = {
+          network_key: network,
+          ref: orderReference,
+          recipient: phoneNumber,
+          capacity: capacity
+        };
+        
+        logOperation('GEONETTECH_ORDER_REQUEST', {
+          ...geonetOrderPayload,
+          processingMethod
+        });
+        
+        const geonetResponse = await geonetClient.post('/placeOrder', geonetOrderPayload);
+        orderResponse = geonetResponse.data;
+        
+        if (!orderResponse || !orderResponse.status || orderResponse.status !== 'success') {
+          logOperation('GEONETTECH_API_UNSUCCESSFUL_RESPONSE', {
+            response: orderResponse,
+            orderReference
+          });
+          
+          await session.abortTransaction();
+          session.endSession();
+          
+          let errorMessage = 'Could not complete your purchase. Please try again later.';
+          
+          if (orderResponse && orderResponse.message) {
+            const msg = orderResponse.message.toLowerCase();
+            
+            if (msg.includes('duplicate') || msg.includes('within 5 minutes')) {
+              errorMessage = 'A similar order was recently placed. Please wait a few minutes before trying again.';
+            } else if (msg.includes('invalid') || msg.includes('phone')) {
+              errorMessage = 'The phone number you entered appears to be invalid. Please check and try again.';
+            } else {
+              errorMessage = orderResponse.message;
+            }
+          }
+          
+          return res.status(400).json({
+            status: 'error',
+            message: errorMessage
+          });
+        }
+        
+        apiOrderId = orderResponse.data ? orderResponse.data.orderId : orderReference;
+        orderStatus = 'completed';
+        
+        logOperation('GEONETTECH_ORDER_SUCCESS', {
+          orderId: apiOrderId,
+          orderReference,
+          processingMethod,
+          responseData: orderResponse
+        });
+      } catch (apiError) {
+        logOperation('GEONETTECH_API_ERROR', {
+          error: apiError.message,
+          response: apiError.response ? apiError.response.data : null,
+          orderReference
+        });
+        
+        await session.abortTransaction();
+        session.endSession();
+        
+        let errorMessage = 'Could not complete your purchase. Please try again later.';
+        
+        if (apiError.response && apiError.response.data && apiError.response.data.message) {
+          errorMessage = apiError.response.data.message;
+        }
+        
+        return res.status(400).json({
+          status: 'error',
+          message: errorMessage
         });
       }
     }
 
-    // Create transaction records (regardless of API call status)
     // Create Transaction
     const transaction = new Transaction({
       userId,
       type: 'purchase',
-      amount: price,
-      status: 'completed', // Transaction is always completed (money deducted)
+      amount: validatedPrice,
+      status: 'completed',
       reference: transactionReference,
-      gateway: 'wallet'
+      gateway: 'wallet',
+      description: `Data purchase: ${capacity}GB ${network} for ${phoneNumber}`
     });
 
-    // Create Data Purchase with appropriate status
+    // Create Data Purchase
     const dataPurchase = new DataPurchase({
       userId,
       phoneNumber,
@@ -502,17 +933,23 @@ router.post('/purchase-data', async (req, res) => {
       capacity,
       gateway: 'wallet',
       method: 'web',
-      price,
-      status: orderStatus, // This will be 'pending' when skipGeonettech=true or 'completed' for successful API calls
+      price: validatedPrice,
+      status: orderStatus,
       geonetReference: orderReference,
       apiOrderId: apiOrderId,
       apiResponse: orderResponse,
-      skipGeonettech: shouldSkipGeonet // Track if Geonettech API was skipped
+      skipGeonettech: shouldSkipGeonet,
+      processingMethod: processingMethod,
+      orderReferencePrefix: orderReferencePrefix,
+      originalReference: (network === 'TELECEL' && inventory?.skipGeonettech) ? originalInternalReference : null
     });
 
-    // Update user wallet (always deduct money)
+    // Update user wallet
     const previousBalance = user.walletBalance;
-    user.walletBalance -= price;
+    user.walletBalance -= validatedPrice;
+
+    // Link transaction to purchase
+    transaction.relatedPurchaseId = dataPurchase._id;
 
     // Save all documents
     await transaction.save({ session });
@@ -523,18 +960,27 @@ router.post('/purchase-data', async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
-    // Prepare response message based on order status
+    // Prepare response message
     let responseMessage = 'Data bundle purchased successfully';
-    if (orderStatus === 'pending') {
-      responseMessage = 'Order placed successfully and is pending processing';
+    if (orderStatus === 'pending' && processingMethod === 'manual') {
+      responseMessage = 'Order placed successfully. Your order will be processed manually.';
     }
 
     logOperation('DATA_PURCHASE_SUCCESS', {
       userId,
       orderStatus,
       orderReference,
+      processingMethod,
       skipGeonettech: shouldSkipGeonet,
-      newWalletBalance: user.walletBalance
+      previousBalance: previousBalance,
+      newWalletBalance: user.walletBalance,
+      amountDeducted: validatedPrice,
+      validatedPrice: validatedPrice,
+      telecelReference: (network === 'TELECEL' && inventory?.skipGeonettech) ? orderReference : null,
+      originalInternalReference: (network === 'TELECEL' && inventory?.skipGeonettech) ? originalInternalReference : null,
+      isATPremium: network === 'AT_PREMIUM',
+      usedGeonettech: processingMethod === 'geonettech_api',
+      usedTelecelAPI: processingMethod === 'telecel_api'
     });
 
     res.status(201).json({
@@ -543,14 +989,22 @@ router.post('/purchase-data', async (req, res) => {
       data: {
         transaction,
         dataPurchase,
-        newWalletBalance: user.walletBalance,
+        walletBalance: {
+          previous: previousBalance,
+          current: user.walletBalance,
+          deducted: validatedPrice
+        },
         orderStatus: orderStatus,
-        skipGeonettech: shouldSkipGeonet
+        orderReference: orderReference,
+        processingMethod: processingMethod,
+        orderPrefix: orderReferencePrefix,
+        validatedPrice: validatedPrice,
+        usedGeonettech: processingMethod === 'geonettech_api',
+        usedTelecelAPI: processingMethod === 'telecel_api'
       }
     });
 
   } catch (error) {
-    // Rollback transaction
     await session.abortTransaction();
     session.endSession();
     
@@ -570,7 +1024,8 @@ router.post('/purchase-data', async (req, res) => {
     });
   }
 });
-// Check Order Status
+
+// Check Order Status (Updated to handle Telecel API)
 router.get('/order-status/:orderId', async (req, res) => {
   try {
     const orderId = req.params.orderId;
@@ -595,46 +1050,103 @@ router.get('/order-status/:orderId', async (req, res) => {
     logOperation('ORDER_STATUS_LOCAL_ORDER_FOUND', {
       orderId,
       localStatus: localOrder.status,
-      geonetReference: localOrder.geonetReference
+      geonetReference: localOrder.geonetReference,
+      network: localOrder.network,
+      processingMethod: localOrder.processingMethod
     });
 
-    // Check status with Geonettech
-    logOperation('GEONETTECH_STATUS_CHECK_REQUEST', {
-      geonetReference: localOrder.geonetReference
-    });
-    
-    const geonetResponse = await geonetClient.get(`/order-status/${localOrder.geonetReference}`);
-    
-    logOperation('GEONETTECH_STATUS_CHECK_RESPONSE', {
-      status: geonetResponse.status,
-      data: geonetResponse.data
-    });
-    
-    // Update local order status if needed
-    if (geonetResponse.data.status === 'completed' && 
-        localOrder.status !== 'completed') {
-      
-      logOperation('ORDER_STATUS_UPDATE_REQUIRED', {
-        oldStatus: localOrder.status,
-        newStatus: 'completed'
+    // Check status based on network and processing method
+    if (localOrder.network === 'TELECEL' && localOrder.processingMethod === 'telecel_api') {
+      // Check status with Telecel API
+      logOperation('TELECEL_STATUS_CHECK_REQUEST', {
+        geonetReference: localOrder.geonetReference
       });
       
-      localOrder.status = 'completed';
-      await localOrder.save();
+      const telecelStatusResponse = await checkTelecelOrderStatus(localOrder.geonetReference);
       
-      logOperation('ORDER_STATUS_UPDATE_COMPLETED', {
-        orderId,
-        status: localOrder.status
+      if (telecelStatusResponse.success) {
+        // Update local order status if needed
+        const apiStatus = telecelStatusResponse.status;
+        if (apiStatus && localOrder.status !== apiStatus) {
+          logOperation('ORDER_STATUS_UPDATE_REQUIRED', {
+            oldStatus: localOrder.status,
+            newStatus: apiStatus
+          });
+          
+          localOrder.status = apiStatus;
+          await localOrder.save();
+          
+          logOperation('ORDER_STATUS_UPDATE_COMPLETED', {
+            orderId,
+            status: localOrder.status
+          });
+        }
+        
+        res.json({
+          status: 'success',
+          data: {
+            localOrder,
+            apiStatus: telecelStatusResponse.data
+          }
+        });
+      } else {
+        res.json({
+          status: 'success',
+          data: {
+            localOrder,
+            apiStatus: null,
+            apiError: telecelStatusResponse.error
+          }
+        });
+      }
+    } else if (localOrder.processingMethod === 'manual') {
+      // For manual processing, just return the local status
+      res.json({
+        status: 'success',
+        data: {
+          localOrder,
+          manualProcessing: true
+        }
+      });
+    } else {
+      // Check status with Geonettech for all other cases
+      logOperation('GEONETTECH_STATUS_CHECK_REQUEST', {
+        geonetReference: localOrder.geonetReference
+      });
+      
+      const geonetResponse = await geonetClient.get(`/order-status/${localOrder.geonetReference}`);
+      
+      logOperation('GEONETTECH_STATUS_CHECK_RESPONSE', {
+        status: geonetResponse.status,
+        data: geonetResponse.data
+      });
+      
+      // Update local order status if needed
+      if (geonetResponse.data.status === 'completed' && 
+          localOrder.status !== 'completed') {
+        
+        logOperation('ORDER_STATUS_UPDATE_REQUIRED', {
+          oldStatus: localOrder.status,
+          newStatus: 'completed'
+        });
+        
+        localOrder.status = 'completed';
+        await localOrder.save();
+        
+        logOperation('ORDER_STATUS_UPDATE_COMPLETED', {
+          orderId,
+          status: localOrder.status
+        });
+      }
+
+      res.json({
+        status: 'success',
+        data: {
+          localOrder,
+          geonetechStatus: geonetResponse.data
+        }
       });
     }
-
-    res.json({
-      status: 'success',
-      data: {
-        localOrder,
-        geonetechStatus: geonetResponse.data
-      }
-    });
 
   } catch (error) {
     logOperation('ORDER_STATUS_CHECK_ERROR', {
@@ -795,7 +1307,7 @@ router.get('/user-transactions/:userId', async (req, res) => {
       returnedCount: transactions.length,
       currentPage: Number(page),
       totalPages: Math.ceil(totalCount / Number(limit))
-    });z
+    });
 
     res.json({
       status: 'success',
@@ -1340,84 +1852,6 @@ router.get('/users-leaderboard', async (req, res) => {
   }
 });
 
-// Websocket real-time leaderboard (add this if you're using Socket.io)
-// This function can be called periodically to emit updates to connected clients
-const emitLeaderboardUpdate = async (io) => {
-  try {
-    logOperation('SOCKET_LEADERBOARD_UPDATE', {
-      timestamp: new Date()
-    });
-
-    const currentTime = new Date();
-    
-    // Same aggregation pipeline as the HTTP endpoint
-    const leaderboard = await DataPurchase.aggregate([
-      {
-        $group: {
-          _id: '$userId',
-          orderCount: { $sum: 1 },
-          totalSpent: { $sum: '$price' },
-          lastOrderDate: { $max: '$createdAt' }
-        }
-      },
-      {
-        $sort: { 
-          orderCount: -1,
-          lastOrderDate: -1
-        }
-      },
-      { $limit: 20 },
-      {
-        $lookup: {
-          from: 'users',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'userDetails'
-        }
-      },
-      { $unwind: '$userDetails' },
-      {
-        $project: {
-          _id: 0,
-          userId: '$_id',
-          name: '$userDetails.name',
-          email: '$userDetails.email',
-          orderCount: 1,
-          totalSpent: 1,
-          lastOrderDate: 1
-        }
-      }
-    ]);
-
-    // Format the leaderboard
-    const formattedLeaderboard = leaderboard.map((user, index) => ({
-      rank: index + 1,
-      userId: user.userId,
-      name: user.name,
-      email: user.email,
-      orderCount: user.orderCount,
-      totalSpent: parseFloat(user.totalSpent.toFixed(2)),
-      lastOrderDate: user.lastOrderDate
-    }));
-
-    // Emit the updated leaderboard to all connected clients
-    io.emit('leaderboardUpdate', {
-      leaderboard: formattedLeaderboard,
-      lastUpdated: currentTime
-    });
-
-    logOperation('SOCKET_LEADERBOARD_EMITTED', {
-      usersCount: formattedLeaderboard.length,
-      timestamp: currentTime
-    });
-    
-  } catch (error) {
-    logOperation('SOCKET_LEADERBOARD_ERROR', {
-      message: error.message,
-      stack: error.stack
-    });
-  }
-};
 // Daily Sales Route - GET endpoint (Fixed for String Dates)
 router.get('/daily-sales', async (req, res) => {
   try {
@@ -1619,4 +2053,5 @@ router.get('/daily-sales', async (req, res) => {
     });
   }
 });
+
 module.exports = router;
