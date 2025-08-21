@@ -9,7 +9,7 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 // ========== DATAMART API CONFIGURATION ==========
-const DATAMART_BASE_URL = 'https://datamartbackened.onrender.com';
+const DATAMART_BASE_URL = 'https://api.datamartgh.shop';
 const DATAMART_API_KEY = process.env.DATAMART_API_KEY || 'fb9b9e81e9640c1861605b4ec333e3bd57bdf70dcce461d766fa877c9c0f7553';
 
 // Create DataMart client
