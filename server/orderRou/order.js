@@ -6,8 +6,8 @@ const { v4: uuidv4 } = require('uuid');
 const { User, DataPurchase, Transaction, DataInventory } = require('../schema/schema');
 
 // Geonettech API Configuration
-const GEONETTECH_BASE_URL = 'https://testhub.geonettech.site/api/v1';
-const GEONETTECH_API_KEY = '42|tjhxBxaWWe4mPUpxXN1uIk0KTxypvlSqOIOQWz6K162aa0d6';
+const GEONETTECH_BASE_URL = 'https://api.datamartgh.shop/api';
+const GEONETTECH_API_KEY = '7554a155a513bb3fc1b696518bd432acb6f4ab41df96e9f9ebea66c781e9ead5';
 
 // Create Geonettech client
 const geonetClient = axios.create({
@@ -662,9 +662,9 @@ router.post('/purchase-data', async (req, res) => {
         processingMethod = 'geonettech_api';
         try {
           const geonetOrderPayload = {
-            network_key: 'TELECEL',
+            network: 'TELECEL',
             ref: orderReference,
-            recipient: phoneNumber,
+            phoneNumber: phoneNumber,
             capacity: capacity
           };
           
@@ -673,7 +673,7 @@ router.post('/purchase-data', async (req, res) => {
             processingMethod
           });
           
-          const geonetResponse = await geonetClient.post('/placeOrder', geonetOrderPayload);
+          const geonetResponse = await geonetClient.post('/developer/purchase', geonetOrderPayload);
           orderResponse = geonetResponse.data;
           
           if (!orderResponse || !orderResponse.status || orderResponse.status !== 'success') {
@@ -741,9 +741,9 @@ router.post('/purchase-data', async (req, res) => {
       processingMethod = 'geonettech_api';
       try {
         const geonetOrderPayload = {
-          network_key: 'AT_PREMIUM', // Use AT_PREMIUM as the network key
+          network: 'AT_PREMIUM', // Use AT_PREMIUM as the network key
           ref: orderReference,
-          recipient: phoneNumber,
+          phoneNumber: phoneNumber,
           capacity: capacity
         };
         
@@ -752,7 +752,7 @@ router.post('/purchase-data', async (req, res) => {
           processingMethod
         });
         
-        const geonetResponse = await geonetClient.post('/placeOrder', geonetOrderPayload);
+        const geonetResponse = await geonetClient.post('/developer/purchase', geonetOrderPayload);
         orderResponse = geonetResponse.data;
         
         if (!orderResponse || !orderResponse.status || orderResponse.status !== 'success') {
@@ -839,9 +839,9 @@ router.post('/purchase-data', async (req, res) => {
       processingMethod = 'geonettech_api';
       try {
         const geonetOrderPayload = {
-          network_key: network,
+          network: network,
           ref: orderReference,
-          recipient: phoneNumber,
+          phoneNumber: phoneNumber,
           capacity: capacity
         };
         
@@ -850,7 +850,7 @@ router.post('/purchase-data', async (req, res) => {
           processingMethod
         });
         
-        const geonetResponse = await geonetClient.post('/placeOrder', geonetOrderPayload);
+        const geonetResponse = await geonetClient.post('/developer/purchase', geonetOrderPayload);
         orderResponse = geonetResponse.data;
         
         if (!orderResponse || !orderResponse.status || orderResponse.status !== 'success') {
