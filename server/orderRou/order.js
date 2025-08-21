@@ -4,12 +4,28 @@ const mongoose = require('mongoose');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const { User, DataPurchase, Transaction, DataInventory } = require('../schema/schema');
+const dotenv = require('dotenv');
 
-// Geonettech API Configuration
-const GEONETTECH_BASE_URL = 'https://api.datamartgh.shop/api';
-const GEONETTECH_API_KEY = '7554a155a513bb3fc1b696518bd432acb6f4ab41df96e9f9ebea66c781e9ead5';
+dotenv.config();
 
-// Create Geonettech client
+// ========== DATAMART API CONFIGURATION ==========
+const DATAMART_BASE_URL = 'https://datamartbackened.onrender.com';
+const DATAMART_API_KEY = process.env.DATAMART_API_KEY || 'fb9b9e81e9640c1861605b4ec333e3bd57bdf70dcce461d766fa877c9c0f7553';
+
+// Create DataMart client
+const datamartClient = axios.create({
+  baseURL: DATAMART_BASE_URL,
+  headers: {
+    'x-api-key': DATAMART_API_KEY,
+    'Content-Type': 'application/json'
+  }
+});
+
+// ========== GEONETTECH API CONFIGURATION (KEPT FOR REFERENCE) ==========
+const GEONETTECH_BASE_URL = 'https://testhub.geonettech.site/api/v1';
+const GEONETTECH_API_KEY = '42|tjhxBxaWWe4mPUpxXN1uIk0KTxypvlSqOIOQWz6K162aa0d6';
+
+// Create Geonettech client (kept for potential future use)
 const geonetClient = axios.create({
   baseURL: GEONETTECH_BASE_URL,
   headers: {
@@ -18,7 +34,7 @@ const geonetClient = axios.create({
   }
 });
 
-// Telecel API Configuration
+// ========== TELECEL API CONFIGURATION ==========
 const TELECEL_API_URL = 'https://iget.onrender.com/api/developer/orders/place';
 const TELECEL_API_KEY = '76013fa9c8bf774ac7fb35db5e586fb7852a618cbf57b9ddb072fc2c465e5fe8';
 
@@ -26,6 +42,24 @@ const TELECEL_API_KEY = '76013fa9c8bf774ac7fb35db5e586fb7852a618cbf57b9ddb072fc2
 const logOperation = (operation, data) => {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] [${operation}]`, JSON.stringify(data, null, 2));
+};
+
+// ========== NETWORK MAPPING FOR DATAMART ==========
+const mapNetworkToDatamart = (networkType) => {
+  const network = networkType.toUpperCase();
+  
+  const networkMap = {
+    'TELECEL': 'TELECEL',
+    'MTN': 'YELLO',
+    'YELLO': 'YELLO',
+    'AIRTEL': 'at',
+    'AT': 'at',
+    'AT_PREMIUM': 'at', // AT_PREMIUM maps to 'at' in DataMart
+    'AIRTELTIGO': 'at',
+    'TIGO': 'at'
+  };
+  
+  return networkMap[network] || network.toLowerCase();
 };
 
 // ===== OFFICIAL PRICING STRUCTURES =====
@@ -362,14 +396,15 @@ async function checkTelecelOrderStatus(reference) {
   }
 }
 
-// Check Agent Wallet Balance
+// Check Agent Wallet Balance (DataMart)
 router.get('/agent-balance', async (req, res) => {
   try {
     logOperation('AGENT_BALANCE_REQUEST', { timestamp: new Date() });
     
-    const response = await geonetClient.get('/checkBalance');
+    // Use DataMart API to check balance
+    const response = await datamartClient.get('/api/agent-balance');
     
-    logOperation('AGENT_BALANCE_RESPONSE', {
+    logOperation('DATAMART_AGENT_BALANCE_RESPONSE', {
       status: response.status,
       data: response.data
     });
@@ -377,7 +412,7 @@ router.get('/agent-balance', async (req, res) => {
     res.json({
       status: 'success',
       data: {
-        balance: parseFloat(response.data.data.balance.replace(/,/g, ''))
+        balance: response.data.data?.balance || 0
       }
     });
   } catch (error) {
@@ -395,7 +430,7 @@ router.get('/agent-balance', async (req, res) => {
   }
 });
 
-// ===== MAIN PURCHASE DATA ROUTE WITH IMPROVED TELECEL AND AT_PREMIUM INTEGRATION =====
+// ===== MAIN PURCHASE DATA ROUTE WITH DATAMART INTEGRATION =====
 router.post('/purchase-data', async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -537,22 +572,21 @@ router.post('/purchase-data', async (req, res) => {
     
     // Determine order reference prefix based on network and processing method
     let orderReferencePrefix = '';
-    // Note: AT_PREMIUM always uses Geonettech, never skip
     const shouldSkipGeonet = inventory?.skipGeonettech && network !== 'TELECEL' && network !== 'AT_PREMIUM';
     
     if (network === 'TELECEL') {
-      // For Telecel, check if we're using Geonettech or Telecel API
+      // For Telecel, check if we're using DataMart or Telecel API
       if (inventory?.skipGeonettech) {
         orderReferencePrefix = 'TC-'; // Direct Telecel API prefix
       } else {
-        orderReferencePrefix = 'GN-TC-'; // Geonettech Telecel prefix
+        orderReferencePrefix = 'DM-TC-'; // DataMart Telecel prefix
       }
     } else if (network === 'AT_PREMIUM') {
-      orderReferencePrefix = 'ATP-'; // Special prefix for AT_PREMIUM
+      orderReferencePrefix = 'DM-ATP-'; // DataMart AT_PREMIUM prefix
     } else if (shouldSkipGeonet) {
       orderReferencePrefix = 'MN-'; // Manual processing prefix
     } else {
-      orderReferencePrefix = 'GN-'; // General Geonettech prefix
+      orderReferencePrefix = 'DM-'; // General DataMart prefix
     }
     
     let orderReference = generateMixedReference(orderReferencePrefix);
@@ -575,7 +609,7 @@ router.post('/purchase-data', async (req, res) => {
     });
     
     if (network === 'TELECEL') {
-      // Check if we should use Geonettech or Telecel API
+      // Check if we should use DataMart or Telecel API
       if (inventory?.skipGeonettech) {
         // Use Telecel API directly
         processingMethod = 'telecel_api';
@@ -658,26 +692,28 @@ router.post('/purchase-data', async (req, res) => {
           });
         }
       } else {
-        // Use Geonettech API for Telecel
-        processingMethod = 'geonettech_api';
+        // Use DataMart API for Telecel
+        processingMethod = 'datamart_api';
         try {
-          const geonetOrderPayload = {
-            network: 'TELECEL',
-            ref: orderReference,
+          const datamartNetwork = mapNetworkToDatamart('TELECEL');
+          const datamartPayload = {
             phoneNumber: phoneNumber,
-            capacity: capacity
+            network: datamartNetwork,
+            capacity: capacity.toString(),
+            gateway: 'wallet',
+            ref: orderReference
           };
           
-          logOperation('GEONETTECH_TELECEL_ORDER_REQUEST', {
-            ...geonetOrderPayload,
+          logOperation('DATAMART_TELECEL_ORDER_REQUEST', {
+            ...datamartPayload,
             processingMethod
           });
           
-          const geonetResponse = await geonetClient.post('/developer/purchase', geonetOrderPayload);
-          orderResponse = geonetResponse.data;
+          const datamartResponse = await datamartClient.post('/api/developer/purchase', datamartPayload);
+          orderResponse = datamartResponse.data;
           
           if (!orderResponse || !orderResponse.status || orderResponse.status !== 'success') {
-            logOperation('GEONETTECH_TELECEL_API_UNSUCCESSFUL_RESPONSE', {
+            logOperation('DATAMART_TELECEL_API_UNSUCCESSFUL_RESPONSE', {
               response: orderResponse,
               orderReference
             });
@@ -705,17 +741,17 @@ router.post('/purchase-data', async (req, res) => {
             });
           }
           
-          apiOrderId = orderResponse.data ? orderResponse.data.orderId : orderReference;
+          apiOrderId = orderResponse.data ? orderResponse.data.purchaseId : orderReference;
           orderStatus = 'completed';
           
-          logOperation('GEONETTECH_TELECEL_ORDER_SUCCESS', {
+          logOperation('DATAMART_TELECEL_ORDER_SUCCESS', {
             orderId: apiOrderId,
             orderReference,
             processingMethod,
             responseData: orderResponse
           });
         } catch (apiError) {
-          logOperation('GEONETTECH_TELECEL_API_ERROR', {
+          logOperation('DATAMART_TELECEL_API_ERROR', {
             error: apiError.message,
             response: apiError.response ? apiError.response.data : null,
             orderReference
@@ -737,26 +773,28 @@ router.post('/purchase-data', async (req, res) => {
         }
       }
     } else if (network === 'AT_PREMIUM') {
-      // AT_PREMIUM always uses Geonettech API
-      processingMethod = 'geonettech_api';
+      // AT_PREMIUM always uses DataMart API
+      processingMethod = 'datamart_api';
       try {
-        const geonetOrderPayload = {
-          network: 'AT_PREMIUM', // Use AT_PREMIUM as the network key
-          ref: orderReference,
+        const datamartNetwork = mapNetworkToDatamart('AT_PREMIUM'); // Maps to 'at'
+        const datamartPayload = {
           phoneNumber: phoneNumber,
-          capacity: capacity
+          network: datamartNetwork,
+          capacity: capacity.toString(),
+          gateway: 'wallet',
+          ref: orderReference
         };
         
-        logOperation('GEONETTECH_AT_PREMIUM_ORDER_REQUEST', {
-          ...geonetOrderPayload,
+        logOperation('DATAMART_AT_PREMIUM_ORDER_REQUEST', {
+          ...datamartPayload,
           processingMethod
         });
         
-        const geonetResponse = await geonetClient.post('/developer/purchase', geonetOrderPayload);
-        orderResponse = geonetResponse.data;
+        const datamartResponse = await datamartClient.post('/api/developer/purchase', datamartPayload);
+        orderResponse = datamartResponse.data;
         
         if (!orderResponse || !orderResponse.status || orderResponse.status !== 'success') {
-          logOperation('GEONETTECH_AT_PREMIUM_API_UNSUCCESSFUL_RESPONSE', {
+          logOperation('DATAMART_AT_PREMIUM_API_UNSUCCESSFUL_RESPONSE', {
             response: orderResponse,
             orderReference
           });
@@ -784,17 +822,17 @@ router.post('/purchase-data', async (req, res) => {
           });
         }
         
-        apiOrderId = orderResponse.data ? orderResponse.data.orderId : orderReference;
+        apiOrderId = orderResponse.data ? orderResponse.data.purchaseId : orderReference;
         orderStatus = 'completed';
         
-        logOperation('GEONETTECH_AT_PREMIUM_ORDER_SUCCESS', {
+        logOperation('DATAMART_AT_PREMIUM_ORDER_SUCCESS', {
           orderId: apiOrderId,
           orderReference,
           processingMethod,
           responseData: orderResponse
         });
       } catch (apiError) {
-        logOperation('GEONETTECH_AT_PREMIUM_API_ERROR', {
+        logOperation('DATAMART_AT_PREMIUM_API_ERROR', {
           error: apiError.message,
           response: apiError.response ? apiError.response.data : null,
           orderReference
@@ -815,9 +853,9 @@ router.post('/purchase-data', async (req, res) => {
         });
       }
     } else if (shouldSkipGeonet) {
-      // Skip Geonettech API - store as pending
+      // Skip DataMart API - store as pending for manual processing
       processingMethod = 'manual';
-      logOperation('SKIPPING_GEONETTECH_API', {
+      logOperation('SKIPPING_DATAMART_API', {
         network,
         phoneNumber: phoneNumber.substring(0, 3) + 'XXXXXXX',
         capacity,
@@ -835,26 +873,28 @@ router.post('/purchase-data', async (req, res) => {
         skipReason: 'API disabled for network'
       };
     } else {
-      // Use Geonettech API for other networks (YELLO, at)
-      processingMethod = 'geonettech_api';
+      // Use DataMart API for other networks (YELLO, at)
+      processingMethod = 'datamart_api';
       try {
-        const geonetOrderPayload = {
-          network: network,
-          ref: orderReference,
+        const datamartNetwork = mapNetworkToDatamart(network);
+        const datamartPayload = {
           phoneNumber: phoneNumber,
-          capacity: capacity
+          network: datamartNetwork,
+          capacity: capacity.toString(),
+          gateway: 'wallet',
+          ref: orderReference
         };
         
-        logOperation('GEONETTECH_ORDER_REQUEST', {
-          ...geonetOrderPayload,
+        logOperation('DATAMART_ORDER_REQUEST', {
+          ...datamartPayload,
           processingMethod
         });
         
-        const geonetResponse = await geonetClient.post('/developer/purchase', geonetOrderPayload);
-        orderResponse = geonetResponse.data;
+        const datamartResponse = await datamartClient.post('/api/developer/purchase', datamartPayload);
+        orderResponse = datamartResponse.data;
         
         if (!orderResponse || !orderResponse.status || orderResponse.status !== 'success') {
-          logOperation('GEONETTECH_API_UNSUCCESSFUL_RESPONSE', {
+          logOperation('DATAMART_API_UNSUCCESSFUL_RESPONSE', {
             response: orderResponse,
             orderReference
           });
@@ -882,17 +922,17 @@ router.post('/purchase-data', async (req, res) => {
           });
         }
         
-        apiOrderId = orderResponse.data ? orderResponse.data.orderId : orderReference;
+        apiOrderId = orderResponse.data ? orderResponse.data.purchaseId : orderReference;
         orderStatus = 'completed';
         
-        logOperation('GEONETTECH_ORDER_SUCCESS', {
+        logOperation('DATAMART_ORDER_SUCCESS', {
           orderId: apiOrderId,
           orderReference,
           processingMethod,
           responseData: orderResponse
         });
       } catch (apiError) {
-        logOperation('GEONETTECH_API_ERROR', {
+        logOperation('DATAMART_API_ERROR', {
           error: apiError.message,
           response: apiError.response ? apiError.response.data : null,
           orderReference
@@ -935,7 +975,7 @@ router.post('/purchase-data', async (req, res) => {
       method: 'web',
       price: validatedPrice,
       status: orderStatus,
-      geonetReference: orderReference,
+      geonetReference: orderReference, // Keep this field name for backward compatibility
       apiOrderId: apiOrderId,
       apiResponse: orderResponse,
       skipGeonettech: shouldSkipGeonet,
@@ -979,7 +1019,7 @@ router.post('/purchase-data', async (req, res) => {
       telecelReference: (network === 'TELECEL' && inventory?.skipGeonettech) ? orderReference : null,
       originalInternalReference: (network === 'TELECEL' && inventory?.skipGeonettech) ? originalInternalReference : null,
       isATPremium: network === 'AT_PREMIUM',
-      usedGeonettech: processingMethod === 'geonettech_api',
+      usedDatamart: processingMethod === 'datamart_api',
       usedTelecelAPI: processingMethod === 'telecel_api'
     });
 
@@ -999,7 +1039,7 @@ router.post('/purchase-data', async (req, res) => {
         processingMethod: processingMethod,
         orderPrefix: orderReferencePrefix,
         validatedPrice: validatedPrice,
-        usedGeonettech: processingMethod === 'geonettech_api',
+        usedDatamart: processingMethod === 'datamart_api',
         usedTelecelAPI: processingMethod === 'telecel_api'
       }
     });
@@ -1025,7 +1065,7 @@ router.post('/purchase-data', async (req, res) => {
   }
 });
 
-// Check Order Status (Updated to handle Telecel API)
+// Check Order Status (Updated to handle DataMart API)
 router.get('/order-status/:orderId', async (req, res) => {
   try {
     const orderId = req.params.orderId;
@@ -1108,42 +1148,65 @@ router.get('/order-status/:orderId', async (req, res) => {
           manualProcessing: true
         }
       });
-    } else {
-      // Check status with Geonettech for all other cases
-      logOperation('GEONETTECH_STATUS_CHECK_REQUEST', {
-        geonetReference: localOrder.geonetReference
+    } else if (localOrder.processingMethod === 'datamart_api') {
+      // Check status with DataMart
+      logOperation('DATAMART_STATUS_CHECK_REQUEST', {
+        purchaseId: localOrder.apiOrderId
       });
       
-      const geonetResponse = await geonetClient.get(`/order-status/${localOrder.geonetReference}`);
-      
-      logOperation('GEONETTECH_STATUS_CHECK_RESPONSE', {
-        status: geonetResponse.status,
-        data: geonetResponse.data
-      });
-      
-      // Update local order status if needed
-      if (geonetResponse.data.status === 'completed' && 
-          localOrder.status !== 'completed') {
+      try {
+        const datamartResponse = await datamartClient.get(`/api/purchase-status/${localOrder.apiOrderId}`);
         
-        logOperation('ORDER_STATUS_UPDATE_REQUIRED', {
-          oldStatus: localOrder.status,
-          newStatus: 'completed'
+        logOperation('DATAMART_STATUS_CHECK_RESPONSE', {
+          status: datamartResponse.status,
+          data: datamartResponse.data
         });
         
-        localOrder.status = 'completed';
-        await localOrder.save();
+        // Update local order status if needed
+        if (datamartResponse.data.status === 'completed' && 
+            localOrder.status !== 'completed') {
+          
+          logOperation('ORDER_STATUS_UPDATE_REQUIRED', {
+            oldStatus: localOrder.status,
+            newStatus: 'completed'
+          });
+          
+          localOrder.status = 'completed';
+          await localOrder.save();
+          
+          logOperation('ORDER_STATUS_UPDATE_COMPLETED', {
+            orderId,
+            status: localOrder.status
+          });
+        }
+
+        res.json({
+          status: 'success',
+          data: {
+            localOrder,
+            datamartStatus: datamartResponse.data
+          }
+        });
+      } catch (datamartError) {
+        logOperation('DATAMART_STATUS_CHECK_ERROR', {
+          error: datamartError.message
+        });
         
-        logOperation('ORDER_STATUS_UPDATE_COMPLETED', {
-          orderId,
-          status: localOrder.status
+        res.json({
+          status: 'success',
+          data: {
+            localOrder,
+            datamartStatus: null,
+            datamartError: datamartError.message
+          }
         });
       }
-
+    } else {
+      // For any other case, return local status
       res.json({
         status: 'success',
         data: {
-          localOrder,
-          geonetechStatus: geonetResponse.data
+          localOrder
         }
       });
     }
@@ -1159,6 +1222,45 @@ router.get('/order-status/:orderId', async (req, res) => {
       status: 'error',
       message: 'Failed to check order status',
       details: error.response ? error.response.data : error.message
+    });
+  }
+});
+
+// Get available data packages from DataMart
+router.get('/data-packages', async (req, res) => {
+  try {
+    const { network } = req.query;
+    
+    // Map to DataMart network code if provided
+    const datamartNetwork = network ? mapNetworkToDatamart(network) : null;
+    
+    logOperation('DATAMART_PACKAGES_REQUEST', {
+      network: network,
+      datamartNetwork: datamartNetwork
+    });
+    
+    // Get packages from DataMart
+    const response = await datamartClient.get('/api/data-packages', {
+      params: datamartNetwork ? { network: datamartNetwork } : {}
+    });
+    
+    logOperation('DATAMART_PACKAGES_RESPONSE', {
+      packagesCount: response.data.data ? response.data.data.length : 0
+    });
+    
+    res.json({
+      status: 'success',
+      data: response.data.data
+    });
+  } catch (error) {
+    logOperation('DATAMART_PACKAGES_ERROR', {
+      error: error.message,
+      response: error.response?.data
+    });
+    
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch data packages'
     });
   }
 });
@@ -1332,6 +1434,10 @@ router.get('/user-transactions/:userId', async (req, res) => {
     });
   }
 });
+
+// Remaining routes stay the same...
+// [Keep all other routes unchanged from the original file]
+// Including: user-dashboard, sales-report, users-leaderboard, daily-sales
 
 router.get('/user-dashboard/:userId', async (req, res) => {
   try {
