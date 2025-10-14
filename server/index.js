@@ -19,6 +19,7 @@ const userStats = require('./userInfo/userInfo.js')
 const adminOrder = require('./allOrders/allorders.js')
 const waiting_orders_export = require('./waitingorders/waiting.js')
 const phoneVerification = require('./PhoneVerifyRoutes/Verification.js')
+const sms = require('./smsRoutes/smsRoutes.js')
 dotenv.config();
 
 // Initialize Express app
@@ -33,6 +34,8 @@ ConnectDB();
 
 // Routes
 app.use('/api/v1', authRouter); // Use the router property
+app.use('/api', sms);
+
 app.use('/api/v1/data', dataOrderRoutes);
 app.use('/api/v1', Deposit);
 app.use('/api/developer', Developer)

@@ -236,6 +236,33 @@ const OrderReportSchema = new mongoose.Schema({
   }
 });
 
+
+const SMSHistorySchema = new mongoose.Schema({
+  campaignId: { type: String, unique: true },
+  sentBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Userdatahustle', required: true },
+  recipients: [{
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'Userdatahustle' },
+    phoneNumber: { type: String, required: true },
+    name: { type: String },
+    status: { type: String, enum: ['sent', 'delivered', 'failed', 'pending'], default: 'sent' }
+  }],
+  message: { type: String, required: true },
+  senderId: { type: String, required: true },
+  method: { type: String, enum: ['quick', 'group'], required: true },
+  groups: [{ type: String }], // For group SMS
+  totalRecipients: { type: Number, required: true },
+  totalSent: { type: Number, default: 0 },
+  totalFailed: { type: Number, default: 0 },
+  creditsUsed: { type: Number, default: 0 },
+  isScheduled: { type: Boolean, default: false },
+  scheduledDate: { type: Date },
+  status: { type: String, enum: ['pending', 'processing', 'completed', 'failed'], default: 'pending' },
+  mnotifyResponse: { type: Object },
+  createdAt: { type: Date, default: Date.now },
+  completedAt: { type: Date }
+});
+
+
 OrderReportSchema.index({ userId: 1 });
 OrderReportSchema.index({ purchaseId: 1 });
 OrderReportSchema.index({ status: 1 });
@@ -248,5 +275,6 @@ const ReferralBonus = mongoose.model("ReferralBonusdatahustle", ReferralBonusSch
 const ApiKey = mongoose.model('ApiKeydatahusle', apiKeySchema);
 const DataInventory = mongoose.model("DataInventorydatahustle", DataInventorySchema);
 const OrderReport = mongoose.model("OrderReporthustle", OrderReportSchema);
+const SMSHistory = mongoose.model("SMSHistory", SMSHistorySchema);
 
-module.exports = { User, DataPurchase, Transaction, ReferralBonus, ApiKey, DataInventory, OrderReport };
+module.exports = { User, DataPurchase, Transaction, ReferralBonus, ApiKey, DataInventory, OrderReport, SMSHistory };
