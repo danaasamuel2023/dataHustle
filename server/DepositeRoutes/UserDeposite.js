@@ -187,7 +187,7 @@ router.post('/deposit', depositLimiter, async (req, res) => {
         amount: paystackAmount,
         currency: 'GHS',
         reference,
-        callback_url: `${process.env.BASE_URL || 'https://datahustle.onrender.com'}/api/payment/callback?reference=${reference}`,
+        callback_url: `${process.env.BASE_URL || 'https://datahustle.shop'}/payment/callback?reference=${reference}`,
         metadata: {
           custom_fields: [
             { display_name: "User ID", variable_name: "user_id", value: userId.toString() },
