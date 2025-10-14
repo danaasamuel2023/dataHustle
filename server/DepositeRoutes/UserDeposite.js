@@ -24,7 +24,7 @@ const SMS_CONFIG = {
 // Rate limiting
 const depositLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: 20,
   message: 'Too many deposit attempts, please try again later'
 });
 
