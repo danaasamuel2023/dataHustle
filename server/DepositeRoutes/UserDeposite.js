@@ -86,7 +86,7 @@ const sendDepositSMS = async (user, amount, newBalance) => {
 
 const sendFraudAlert = async (transaction, user) => {
   try {
-    const adminPhone = process.env.ADMIN_PHONE || '233597760914';
+    const adminPhone = process.env.ADMIN_PHONE || '233XXXXXXXXX';
     const message = `🚨 FRAUD! User: ${user.name} (${user.phoneNumber}). Ref: ${transaction.reference}. Expected: ${transaction.metadata.expectedPaystackAmount}, Paid: ${transaction.metadata.actualAmountPaid}`;
     await sendSMS(adminPhone, message);
   } catch (error) {
@@ -413,9 +413,22 @@ router.get('/callback', async (req, res) => {
       }
       
       const actualAmountPaid = paystackData.amount / 100;
-      const expectedAmount = transaction.metadata?.expectedPaystackAmount || transaction.amount;
       
-      if (Math.abs(actualAmountPaid - expectedAmount) > 0.02) {
+      // Get expected amount - if no metadata, calculate it based on current fee structure
+      let expectedAmount;
+      if (transaction.metadata?.expectedPaystackAmount) {
+        expectedAmount = transaction.metadata.expectedPaystackAmount;
+      } else {
+        // Old transaction without metadata - calculate expected amount
+        const calculatedFee = transaction.amount * FEE_PERCENTAGE;
+        expectedAmount = transaction.amount + calculatedFee;
+        console.warn(`⚠️ Callback: Transaction ${reference} missing metadata. Calculated: ${expectedAmount}`);
+      }
+      
+      // ✅ FRAUD CHECK - Use same tolerance as main verification (1% or 0.5 GHS minimum)
+      const tolerance = Math.max(0.5, expectedAmount * 0.01);
+      
+      if (Math.abs(actualAmountPaid - expectedAmount) > tolerance) {
         console.error('🚨 FRAUD in callback:', { reference, expectedAmount, actualAmountPaid });
         transaction.status = 'failed';
         transaction.metadata = {
