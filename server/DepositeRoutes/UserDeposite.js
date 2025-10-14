@@ -17,7 +17,7 @@ const FEE_PERCENTAGE = 0.02;
 // mNotify SMS configuration
 const SMS_CONFIG = {
   API_KEY: process.env.MNOTIFY_API_KEY || 'w3rGWhv4e235nDwYvD5gVDyrW',
-  SENDER_ID: 'DataHustle',
+  SENDER_ID: 'DataHustleGH',
   BASE_URL: 'https://apps.mnotify.net/smsapi'
 };
 
@@ -88,7 +88,7 @@ const sendDepositSMS = async (user, amount, newBalance) => {
 
 const sendFraudAlert = async (transaction, user) => {
   try {
-    const adminPhone = process.env.ADMIN_PHONE || '233597760914';
+    const adminPhone = process.env.ADMIN_PHONE || '233XXXXXXXXX';
     const message = `🚨 FRAUD ALERT! User: ${user.name} (${user.phoneNumber}). Ref: ${transaction.reference}. Expected: GHS ${transaction.metadata.expectedPaystackAmount}, Paid: GHS ${transaction.metadata.actualAmountPaid}. Check immediately!`;
     await sendSMS(adminPhone, message);
   } catch (error) {
@@ -339,23 +339,7 @@ router.get('/callback', async (req, res) => {
   try {
     const { reference } = req.query;
     if (!reference) {
-      return res.status(400).send(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Error - DataHustleGH</title>
-            <style>
-              body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-              .error { color: #d32f2f; }
-            </style>
-          </head>
-          <body>
-            <h1 class="error">Error</h1>
-            <p>Invalid payment reference</p>
-            <a href="https://www.datahustle.shop">Return to Home</a>
-          </body>
-        </html>
-      `);
+      return res.redirect('https://www.datahustle.shop/payment/callback?error=no_reference');
     }
     console.log(`Payment callback received for reference: ${reference}`);
     try {
@@ -371,35 +355,10 @@ router.get('/callback', async (req, res) => {
       const paystackData = paystackResponse.data.data;
       const transaction = await Transaction.findOne({ reference });
       if (!transaction) {
-        return res.status(404).send(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <title>Error - DataHustleGH</title>
-            </head>
-            <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
-              <h1 style="color: #d32f2f;">Transaction Not Found</h1>
-              <p>Reference: ${reference}</p>
-              <a href="https://www.datahustle.shop">Return to Home</a>
-            </body>
-          </html>
-        `);
+        return res.redirect(`https://www.datahustle.shop/payment/callback?reference=${reference}`);
       }
       if (paystackData.status !== 'success') {
-        return res.send(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <title>Payment Failed - DataHustleGH</title>
-              <meta http-equiv="refresh" content="3;url=https://www.datahustle.shop/deposit-failed" />
-            </head>
-            <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
-              <h1 style="color: #d32f2f;">Payment Failed</h1>
-              <p>Status: ${paystackData.status}</p>
-              <p>Redirecting...</p>
-            </body>
-          </html>
-        `);
+        return res.redirect(`https://www.datahustle.shop/payment/callback?reference=${reference}`);
       }
       const actualAmountPaid = paystackData.amount / 100;
       const expectedAmount = transaction.metadata?.expectedPaystackAmount || transaction.amount;
@@ -424,92 +383,17 @@ router.get('/callback', async (req, res) => {
         if (user) {
           await sendFraudAlert(transaction, user);
         }
-        return res.send(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <title>Payment Verification Failed - DataHustleGH</title>
-              <meta http-equiv="refresh" content="5;url=https://www.datahustle.shop/deposit-failed" />
-            </head>
-            <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
-              <h1 style="color: #d32f2f;">Payment Verification Failed</h1>
-              <p>Your payment could not be verified. Our team has been notified.</p>
-              <p>Reference: ${reference}</p>
-              <p>Please contact support if you believe this is an error.</p>
-              <p>Redirecting...</p>
-            </body>
-          </html>
-        `);
+        return res.redirect(`https://www.datahustle.shop/payment/callback?reference=${reference}`);
       }
       const result = await processSuccessfulPayment(reference);
-      if (result.success) {
-        return res.send(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <title>Payment Successful - DataHustleGH</title>
-              <meta http-equiv="refresh" content="3;url=https://www.datahustle.shop/deposit-success?amount=${transaction.amount}" />
-            </head>
-            <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
-              <div style="max-width: 500px; margin: 0 auto; padding: 30px; border: 2px solid #4caf50; border-radius: 10px;">
-                <h1 style="color: #4caf50;">✅ Payment Successful!</h1>
-                <p style="font-size: 18px;">GHS ${transaction.amount.toFixed(2)} has been credited to your account</p>
-                <p style="font-size: 16px; color: #666;">New Balance: <strong>GHS ${result.newBalance.toFixed(2)}</strong></p>
-                <p style="font-size: 14px; color: #999;">Reference: ${reference}</p>
-                <p>Redirecting...</p>
-              </div>
-            </body>
-          </html>
-        `);
-      } else {
-        return res.send(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <title>Payment Processing Failed - DataHustleGH</title>
-              <meta http-equiv="refresh" content="3;url=https://www.datahustle.shop/deposit-failed" />
-            </head>
-            <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
-              <h1 style="color: #d32f2f;">Payment Processing Failed</h1>
-              <p>${result.message}</p>
-              <p>Redirecting...</p>
-            </body>
-          </html>
-        `);
-      }
+      return res.redirect(`https://www.datahustle.shop/payment/callback?reference=${reference}`);
     } catch (paystackError) {
       console.error('Paystack Verification Error in Callback:', paystackError.response?.data || paystackError.message);
-      return res.status(500).send(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Verification Error - DataHustleGH</title>
-          </head>
-          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
-            <h1 style="color: #d32f2f;">Verification Error</h1>
-            <p>Unable to verify payment with payment provider.</p>
-            <p>Reference: ${reference}</p>
-            <p>Please contact support for assistance.</p>
-            <a href="https://www.datahustle.shop">Return to Home</a>
-          </body>
-        </html>
-      `);
+      return res.redirect(`https://www.datahustle.shop/payment/callback?reference=${reference}`);
     }
   } catch (error) {
     console.error('Callback Error:', error);
-    return res.status(500).send(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Error - DataHustleGH</title>
-        </head>
-        <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
-          <h1 style="color: #d32f2f;">Error</h1>
-          <p>An error occurred processing your payment</p>
-          <a href="https://www.datahustle.shop">Return to Home</a>
-        </body>
-      </html>
-    `);
+    return res.redirect('https://www.datahustle.shop/payment/callback?error=processing_error');
   }
 });
 
