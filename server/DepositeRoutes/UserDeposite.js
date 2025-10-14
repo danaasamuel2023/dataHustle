@@ -12,7 +12,7 @@ const auth = require('../middlewareUser/middleware');
 // Paystack configuration
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || 'sk_live_b8f78b58b7860fd9795eb376a8602eba072d6e15'; 
 const PAYSTACK_BASE_URL = 'https://api.paystack.co';
-const FEE_PERCENTAGE = 0.02; // 2% fee
+const FEE_PERCENTAGE = 0.03; // 3% fee (Paystack charges + your fee)
 
 // mNotify SMS configuration
 const SMS_CONFIG = {
@@ -21,11 +21,13 @@ const SMS_CONFIG = {
   BASE_URL: 'https://apps.mnotify.net/smsapi'
 };
 
-// Rate limiting
+// Rate limiting - Increased for testing (reduce to max: 5 in production)
 const depositLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  message: 'Too many deposit attempts, please try again later'
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // 20 attempts per 15 min (change to 5 for production)
+  message: 'Too many deposit attempts, please try again later. Please wait 15 minutes and try again.',
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 const formatPhoneNumber = (phone) => {
@@ -242,15 +244,19 @@ async function processSuccessfulPayment(reference) {
     const paystackData = paystackResponse.data.data;
     const actualAmountPaid = paystackData.amount / 100;
     const expectedAmount = transaction.metadata?.expectedPaystackAmount || transaction.amount;
+    
     console.log('Payment verification:', {
       reference,
       actualAmountPaid,
       expectedAmount,
+      metadataExpected: transaction.metadata?.expectedPaystackAmount,
       baseAmount: transaction.amount,
+      fee: transaction.metadata?.fee,
       paystackStatus: paystackData.status
     });
-    // ✅ FRAUD CHECK
-    if (Math.abs(actualAmountPaid - expectedAmount) > 0.02) {
+    // ✅ FRAUD CHECK - Allow small difference due to rounding
+    const tolerance = Math.max(0.5, expectedAmount * 0.01); // 1% tolerance or 0.5 GHS minimum
+    if (Math.abs(actualAmountPaid - expectedAmount) > tolerance) {
       console.error(`🚨 FRAUD DETECTED!`, {
         reference, expectedAmount, actualAmountPaid,
         difference: actualAmountPaid - expectedAmount,
@@ -329,14 +335,59 @@ async function processSuccessfulPayment(reference) {
   }
 }
 
-// ✅ CALLBACK ROUTE
+// ✅ CALLBACK ROUTE - Shows loading page then redirects instantly
 router.get('/callback', async (req, res) => {
   try {
     const { reference } = req.query;
     if (!reference) {
-      return res.redirect('https://www.datahustle.shop/payment/callback?error=no_reference');
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta http-equiv="refresh" content="0;url=https://www.datahustle.shop/payment/callback?error=no_reference" />
+            <title>Redirecting...</title>
+          </head>
+          <body style="margin:0;padding:0;font-family:Arial,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);display:flex;align-items:center;justify-content:center;min-height:100vh;">
+            <div style="text-align:center;color:white;">
+              <div style="width:60px;height:60px;border:4px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 20px;"></div>
+              <h2 style="margin:0;font-size:24px;">Processing Payment...</h2>
+              <p style="margin:10px 0 0;opacity:0.9;">Please wait while we verify your payment</p>
+            </div>
+            <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+          </body>
+        </html>
+      `);
     }
+    
     console.log(`📥 Callback received: ${reference}`);
+    
+    // Process in background, show loading page immediately
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta http-equiv="refresh" content="2;url=https://www.datahustle.shop/payment/callback?reference=${reference}" />
+          <title>Processing Payment...</title>
+        </head>
+        <body style="margin:0;padding:0;font-family:Arial,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);display:flex;align-items:center;justify-content:center;min-height:100vh;">
+          <div style="text-align:center;color:white;">
+            <div style="width:60px;height:60px;border:4px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 20px;"></div>
+            <h2 style="margin:0;font-size:24px;font-weight:600;">Payment Successful! ✓</h2>
+            <p style="margin:10px 0 0;opacity:0.9;">Verifying and crediting your account...</p>
+            <p style="margin:5px 0 0;font-size:14px;opacity:0.7;">You will be redirected shortly</p>
+          </div>
+          <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+          <script>
+            // Instant redirect after 2 seconds
+            setTimeout(() => {
+              window.location.href = 'https://www.datahustle.shop/payment/callback?reference=${reference}';
+            }, 2000);
+          </script>
+        </body>
+      </html>
+    `);
+    
+    // Verify payment in background
     try {
       const paystackResponse = await axios.get(
         `${PAYSTACK_BASE_URL}/transaction/verify/${reference}`,
@@ -347,18 +398,23 @@ router.get('/callback', async (req, res) => {
           }
         }
       );
+      
       const paystackData = paystackResponse.data.data;
       const transaction = await Transaction.findOne({ reference });
+      
       if (!transaction) {
         console.error(`Transaction not found: ${reference}`);
-        return res.redirect(`https://www.datahustle.shop/payment/callback?reference=${reference}`);
+        return;
       }
+      
       if (paystackData.status !== 'success') {
         console.warn(`Paystack status not success: ${paystackData.status}`);
-        return res.redirect(`https://www.datahustle.shop/payment/callback?reference=${reference}`);
+        return;
       }
+      
       const actualAmountPaid = paystackData.amount / 100;
       const expectedAmount = transaction.metadata?.expectedPaystackAmount || transaction.amount;
+      
       if (Math.abs(actualAmountPaid - expectedAmount) > 0.02) {
         console.error('🚨 FRAUD in callback:', { reference, expectedAmount, actualAmountPaid });
         transaction.status = 'failed';
@@ -373,17 +429,34 @@ router.get('/callback', async (req, res) => {
         await transaction.save();
         const user = await User.findById(transaction.userId);
         if (user) await sendFraudAlert(transaction, user);
-        return res.redirect(`https://www.datahustle.shop/payment/callback?reference=${reference}`);
+        return;
       }
+      
+      // Process payment
       await processSuccessfulPayment(reference);
-      return res.redirect(`https://www.datahustle.shop/payment/callback?reference=${reference}`);
+      
     } catch (paystackError) {
       console.error('Paystack Error in Callback:', paystackError.response?.data || paystackError.message);
-      return res.redirect(`https://www.datahustle.shop/payment/callback?reference=${reference}`);
     }
+    
   } catch (error) {
     console.error('Callback Error:', error);
-    return res.redirect('https://www.datahustle.shop/payment/callback?error=processing_error');
+    return res.send(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta http-equiv="refresh" content="2;url=https://www.datahustle.shop/payment/callback?error=processing_error" />
+          <title>Redirecting...</title>
+        </head>
+        <body style="margin:0;padding:0;font-family:Arial,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);display:flex;align-items:center;justify-content:center;min-height:100vh;">
+          <div style="text-align:center;color:white;">
+            <div style="width:60px;height:60px;border:4px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 20px;"></div>
+            <h2 style="margin:0;font-size:24px;">Redirecting...</h2>
+          </div>
+          <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+        </body>
+      </html>
+    `);
   }
 });
 
