@@ -17,7 +17,7 @@ const FEE_PERCENTAGE = 0.03; // 3% fee (Paystack charges + your fee)
 // mNotify SMS configuration
 const SMS_CONFIG = {
   API_KEY: process.env.MNOTIFY_API_KEY || 'w3rGWhv4e235nDwYvD5gVDyrW',
-  SENDER_ID: 'DataHustleGH',
+  SENDER_ID: 'DataHustle',
   BASE_URL: 'https://apps.mnotify.net/smsapi'
 };
 
@@ -86,7 +86,7 @@ const sendDepositSMS = async (user, amount, newBalance) => {
 
 const sendFraudAlert = async (transaction, user) => {
   try {
-    const adminPhone = process.env.ADMIN_PHONE || '233XXXXXXXXX';
+    const adminPhone = process.env.ADMIN_PHONE || '233597760914';
     const message = `🚨 FRAUD! User: ${user.name} (${user.phoneNumber}). Ref: ${transaction.reference}. Expected: ${transaction.metadata.expectedPaystackAmount}, Paid: ${transaction.metadata.actualAmountPaid}`;
     await sendSMS(adminPhone, message);
   } catch (error) {
