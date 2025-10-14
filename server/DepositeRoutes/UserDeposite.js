@@ -17,7 +17,7 @@ const FEE_PERCENTAGE = 0.03; // 3% fee (Paystack charges + your fee)
 // mNotify SMS configuration
 const SMS_CONFIG = {
   API_KEY: process.env.MNOTIFY_API_KEY || 'w3rGWhv4e235nDwYvD5gVDyrW',
-  SENDER_ID: 'DataHustle',
+  SENDER_ID: 'DataHustleGH',
   BASE_URL: 'https://apps.mnotify.net/smsapi'
 };
 
@@ -187,7 +187,7 @@ router.post('/deposit', depositLimiter, async (req, res) => {
         amount: paystackAmount,
         currency: 'GHS',
         reference,
-        callback_url: `${process.env.BASE_URL || 'https://datahustle.shop'}/payment/callback?reference=${reference}`,
+        callback_url: `${process.env.BASE_URL || 'https://datahustle.onrender.com'}/api/payment/callback?reference=${reference}`,
         metadata: {
           custom_fields: [
             { display_name: "User ID", variable_name: "user_id", value: userId.toString() },
@@ -243,7 +243,17 @@ async function processSuccessfulPayment(reference) {
     );
     const paystackData = paystackResponse.data.data;
     const actualAmountPaid = paystackData.amount / 100;
-    const expectedAmount = transaction.metadata?.expectedPaystackAmount || transaction.amount;
+    
+    // ✅ Get expected amount - calculate if metadata missing
+    let expectedAmount;
+    if (transaction.metadata?.expectedPaystackAmount) {
+      expectedAmount = transaction.metadata.expectedPaystackAmount;
+    } else {
+      // Old transaction without metadata - calculate expected amount with fee
+      const calculatedFee = transaction.amount * FEE_PERCENTAGE;
+      expectedAmount = transaction.amount + calculatedFee;
+      console.warn(`⚠️ Transaction ${reference} missing expectedPaystackAmount. Calculated: ${expectedAmount}`);
+    }
     
     console.log('Payment verification:', {
       reference,
@@ -251,11 +261,14 @@ async function processSuccessfulPayment(reference) {
       expectedAmount,
       metadataExpected: transaction.metadata?.expectedPaystackAmount,
       baseAmount: transaction.amount,
-      fee: transaction.metadata?.fee,
+      fee: transaction.metadata?.fee || (transaction.amount * FEE_PERCENTAGE),
       paystackStatus: paystackData.status
     });
-    // ✅ FRAUD CHECK - Allow small difference due to rounding
-    const tolerance = Math.max(0.5, expectedAmount * 0.01); // 1% tolerance or 0.5 GHS minimum
+    
+    // ✅ FRAUD CHECK - Allow 1% tolerance for rounding
+    const tolerance = Math.max(0.5, expectedAmount * 0.01);
+    console.log(`Fraud check: actualAmountPaid=${actualAmountPaid}, expectedAmount=${expectedAmount}, tolerance=${tolerance}, difference=${Math.abs(actualAmountPaid - expectedAmount)}`);
+    
     if (Math.abs(actualAmountPaid - expectedAmount) > tolerance) {
       console.error(`🚨 FRAUD DETECTED!`, {
         reference, expectedAmount, actualAmountPaid,
