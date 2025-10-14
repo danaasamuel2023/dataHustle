@@ -14,30 +14,25 @@ function PaymentCallbackClient() {
   const reference = searchParams.get('reference');
   
   useEffect(() => {
-    // Only proceed if we have a reference from the URL
     if (reference) {
       let checkCount = 0;
-      const maxChecks = 10; // Maximum number of verification attempts
+      const maxChecks = 10;
       
       const verifyPayment = async () => {
         try {
-          // Call your backend to verify the payment status
           const response = await axios.get(`https://datahustle.onrender.com/api/v1/verify-payment?reference=${reference}`);
           
           if (response.data.success) {
             setStatus('success');
-            setMessage('Your deposit was successful! Funds have been added to your wallet.');
-            // No need to check anymore
+            setMessage(`Your deposit of GHS ${response.data.data.amount.toFixed(2)} was successful! Funds have been added to your wallet.`);
             return true;
           } else if (response.data.data && response.data.data.status === 'failed') {
             setStatus('failed');
             setMessage('Payment failed. Please try again or contact support.');
             return true;
           } else if (checkCount < maxChecks) {
-            // Still pending, continue checking
             return false;
           } else {
-            // Reached max attempts, tell user to check account later
             setStatus('pending');
             setMessage('Your payment is still processing. Please check your account in a few minutes.');
             return true;
@@ -45,11 +40,10 @@ function PaymentCallbackClient() {
         } catch (error) {
           console.error('Verification error:', error);
           if (checkCount < maxChecks) {
-            // Error occurred but still have attempts left
             return false;
           } else {
             setStatus('failed');
-            setMessage('An error occurred while verifying your payment. Please contact support.');
+            setMessage('An error occurred while verifying your payment. Please contact support with your reference number.');
             return true;
           }
         }
@@ -60,23 +54,19 @@ function PaymentCallbackClient() {
         
         if (!isComplete) {
           checkCount++;
-          // Wait 3 seconds before checking again
           setTimeout(checkPaymentStatus, 3000);
         }
       };
       
-      // Start the verification process
       checkPaymentStatus();
     }
   }, [reference]);
 
-  // Handle redirect to dashboard after success
   useEffect(() => {
     if (status === 'success') {
-      // Optionally auto-redirect after a few seconds
       const redirectTimer = setTimeout(() => {
         router.push('/');
-      }, 5000); // Redirect after 5 seconds
+      }, 5000);
       
       return () => clearTimeout(redirectTimer);
     }
@@ -86,7 +76,6 @@ function PaymentCallbackClient() {
     processing: {
       icon: (
         <div className="relative">
-          {/* Outer rotating ring */}
           <motion.div
             className="absolute inset-0"
             animate={{ rotate: 360 }}
@@ -95,8 +84,6 @@ function PaymentCallbackClient() {
             <div className="w-24 h-24 rounded-full border-4 border-transparent 
                           border-t-blue-500 border-r-blue-500 dark:border-t-blue-400 dark:border-r-blue-400"></div>
           </motion.div>
-          
-          {/* Inner rotating ring - opposite direction */}
           <motion.div
             className="absolute inset-2"
             animate={{ rotate: -360 }}
@@ -105,8 +92,6 @@ function PaymentCallbackClient() {
             <div className="w-20 h-20 rounded-full border-4 border-transparent 
                           border-b-purple-500 border-l-purple-500 dark:border-b-purple-400 dark:border-l-purple-400"></div>
           </motion.div>
-          
-          {/* Center dot */}
           <motion.div
             className="absolute inset-8"
             animate={{ scale: [0.8, 1.2, 0.8] }}
@@ -204,24 +189,17 @@ function PaymentCallbackClient() {
 
   return (
     <div className={`flex items-center justify-center min-h-screen bg-gradient-to-br ${currentConfig.bgGradient} transition-all duration-1000`}>
-      {/* Animated background shapes */}
       <div className="absolute inset-0 overflow-hidden">
         <motion.div
           className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400 dark:bg-blue-600 rounded-full 
                      mix-blend-multiply dark:mix-blend-screen filter blur-xl opacity-30"
-          animate={{
-            x: [0, 100, 0],
-            y: [0, 50, 0],
-          }}
+          animate={{ x: [0, 100, 0], y: [0, 50, 0] }}
           transition={{ duration: 20, repeat: Infinity }}
         />
         <motion.div
           className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-400 dark:bg-purple-600 rounded-full 
                      mix-blend-multiply dark:mix-blend-screen filter blur-xl opacity-30"
-          animate={{
-            x: [0, -100, 0],
-            y: [0, -50, 0],
-          }}
+          animate={{ x: [0, -100, 0], y: [0, -50, 0] }}
           transition={{ duration: 15, repeat: Infinity }}
         />
       </div>
@@ -233,7 +211,7 @@ function PaymentCallbackClient() {
         className="relative z-10"
       >
         <div className={`w-full max-w-md p-8 ${currentConfig.cardBg} rounded-2xl shadow-2xl 
-                      border border-gray-200 dark:border-gray-700 transform transition-all duration-500`}>
+                      border border-gray-200 dark:border-gray-700`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={status}
@@ -243,7 +221,7 @@ function PaymentCallbackClient() {
               transition={{ duration: 0.3 }}
               className="text-center"
             >
-              <h1 className={`text-3xl font-bold ${currentConfig.titleColor} mb-8 transition-colors duration-500`}>
+              <h1 className={`text-3xl font-bold ${currentConfig.titleColor} mb-8`}>
                 Payment {status.charAt(0).toUpperCase() + status.slice(1)}
               </h1>
               
@@ -267,7 +245,7 @@ function PaymentCallbackClient() {
                   transition={{ delay: 0.5 }}
                 >
                   <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                    Redirecting you to dashboard in a few seconds...
+                    Redirecting to dashboard in a few seconds...
                   </p>
                   <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
                     <motion.div
@@ -299,7 +277,7 @@ function PaymentCallbackClient() {
                   </Link>
                   
                   {status === 'failed' && (
-                    <Link href="/deposit" className="block">
+                    <Link href="/" className="block">
                       <motion.div
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
@@ -324,6 +302,11 @@ function PaymentCallbackClient() {
                     {reference || 'N/A'}
                   </span>
                 </p>
+                {status === 'failed' && (
+                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                    Please contact support with this reference if you need assistance
+                  </p>
+                )}
               </motion.div>
             </motion.div>
           </AnimatePresence>
@@ -333,7 +316,6 @@ function PaymentCallbackClient() {
   );
 }
 
-// Fallback component to show while loading
 function PaymentCallbackFallback() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 
@@ -363,7 +345,6 @@ function PaymentCallbackFallback() {
   );
 }
 
-// Main component that wraps the client component with Suspense
 export default function PaymentCallback() {
   return (
     <Suspense fallback={<PaymentCallbackFallback />}>

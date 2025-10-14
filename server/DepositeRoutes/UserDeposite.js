@@ -12,7 +12,7 @@ const auth = require('../middlewareUser/middleware');
 // Paystack configuration
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || 'sk_live_b8f78b58b7860fd9795eb376a8602eba072d6e15'; 
 const PAYSTACK_BASE_URL = 'https://api.paystack.co';
-const FEE_PERCENTAGE = 0.02;
+const FEE_PERCENTAGE = 0.02; // 2% fee
 
 // mNotify SMS configuration
 const SMS_CONFIG = {
@@ -54,14 +54,12 @@ const sendSMS = async (to, message) => {
       responseCode = parseInt(response.data.code);
     }
     if (isNaN(responseCode)) {
-      if (response.status === 200) {
-        return { success: true, message: 'SMS sent (assumed successful)' };
-      }
+      if (response.status === 200) return { success: true, message: 'SMS sent' };
       throw new Error(`Invalid response: ${JSON.stringify(response.data)}`);
     }
     switch (responseCode) {
-      case 1000: return { success: true, message: 'SMS sent successfully', code: responseCode };
-      case 1007: return { success: true, message: 'SMS scheduled', code: responseCode };
+      case 1000: return { success: true, message: 'SMS sent successfully' };
+      case 1007: return { success: true, message: 'SMS scheduled' };
       default: throw new Error(`SMS Error Code: ${responseCode}`);
     }
   } catch (error) {
@@ -76,8 +74,6 @@ const sendDepositSMS = async (user, amount, newBalance) => {
     const result = await sendSMS(user.phoneNumber, message);
     if (result.success) {
       console.log(`Deposit SMS sent to ${user.phoneNumber}`);
-    } else {
-      console.error(`Failed to send deposit SMS:`, result.error);
     }
     return result;
   } catch (error) {
@@ -89,7 +85,7 @@ const sendDepositSMS = async (user, amount, newBalance) => {
 const sendFraudAlert = async (transaction, user) => {
   try {
     const adminPhone = process.env.ADMIN_PHONE || '233XXXXXXXXX';
-    const message = `🚨 FRAUD ALERT! User: ${user.name} (${user.phoneNumber}). Ref: ${transaction.reference}. Expected: GHS ${transaction.metadata.expectedPaystackAmount}, Paid: GHS ${transaction.metadata.actualAmountPaid}. Check immediately!`;
+    const message = `🚨 FRAUD! User: ${user.name} (${user.phoneNumber}). Ref: ${transaction.reference}. Expected: ${transaction.metadata.expectedPaystackAmount}, Paid: ${transaction.metadata.actualAmountPaid}`;
     await sendSMS(adminPhone, message);
   } catch (error) {
     console.error('Fraud Alert SMS Error:', error);
@@ -117,7 +113,7 @@ const checkSuspiciousActivity = async (userId, ip) => {
     });
     const isSuspicious = recentDepositsByIP > 10 || recentDepositsByUser > 5 || recentLargeDeposits > 2;
     if (isSuspicious) {
-      console.warn('🚨 SUSPICIOUS ACTIVITY:', { userId, ip, recentDepositsByIP, recentDepositsByUser, recentLargeDeposits });
+      console.warn('🚨 SUSPICIOUS:', { userId, ip, recentDepositsByIP, recentDepositsByUser, recentLargeDeposits });
     }
     return {
       isSuspicious,
@@ -129,6 +125,7 @@ const checkSuspiciousActivity = async (userId, ip) => {
   }
 };
 
+// ✅ INITIATE DEPOSIT
 router.post('/deposit', depositLimiter, async (req, res) => {
   try {
     const { userId, amount, email } = req.body;
@@ -142,14 +139,14 @@ router.post('/deposit', depositLimiter, async (req, res) => {
     if (user.isDisabled) {
       return res.status(403).json({
         success: false,
-        error: 'Account is disabled',
-        message: 'Your account has been disabled. Deposits are not allowed.',
+        error: 'Account disabled',
+        message: 'Your account has been disabled',
         disableReason: user.disableReason || 'No reason provided'
       });
     }
     const depositAmount = parseFloat(amount);
     if (depositAmount > 50000) {
-      return res.status(400).json({ success: false, error: 'Maximum deposit amount is GHS 50,000' });
+      return res.status(400).json({ success: false, error: 'Maximum deposit is GHS 50,000' });
     }
     const fee = depositAmount * FEE_PERCENTAGE;
     const totalAmountWithFee = depositAmount + fee;
@@ -162,15 +159,15 @@ router.post('/deposit', depositLimiter, async (req, res) => {
       userId,
       type: 'deposit',
       amount: depositAmount,
-      balanceBefore: balanceBefore,
-      balanceAfter: balanceAfter,
+      balanceBefore,
+      balanceAfter,
       status: 'pending',
       reference,
       gateway: 'paystack',
       description: `Wallet deposit via Paystack`,
       metadata: {
         expectedPaystackAmount: totalAmountWithFee,
-        fee: fee,
+        fee,
         baseAmount: depositAmount,
         ip: clientIP,
         userAgent: req.headers['user-agent'],
@@ -188,7 +185,7 @@ router.post('/deposit', depositLimiter, async (req, res) => {
         amount: paystackAmount,
         currency: 'GHS',
         reference,
-        callback_url: `${process.env.BASE_URL || 'https://www.datahustle.shop'}/payment/callback?reference=${reference}`,
+        callback_url: `${process.env.BASE_URL || 'https://datahustle.onrender.com'}/api/payment/callback?reference=${reference}`,
         metadata: {
           custom_fields: [
             { display_name: "User ID", variable_name: "user_id", value: userId.toString() },
@@ -210,7 +207,7 @@ router.post('/deposit', depositLimiter, async (req, res) => {
       reference,
       depositInfo: {
         baseAmount: depositAmount,
-        fee: fee,
+        fee,
         totalAmount: totalAmountWithFee
       }
     });
@@ -220,6 +217,7 @@ router.post('/deposit', depositLimiter, async (req, res) => {
   }
 });
 
+// ✅ PROCESS SUCCESSFUL PAYMENT
 async function processSuccessfulPayment(reference) {
   const transaction = await Transaction.findOneAndUpdate(
     { reference, status: 'pending', processing: { $ne: true } },
@@ -231,7 +229,7 @@ async function processSuccessfulPayment(reference) {
     return { success: false, message: 'Transaction not found or already processed' };
   }
   try {
-    console.log(`Verifying payment with Paystack: ${reference}`);
+    console.log(`✅ Verifying payment with Paystack: ${reference}`);
     const paystackResponse = await axios.get(
       `${PAYSTACK_BASE_URL}/transaction/verify/${reference}`,
       {
@@ -251,13 +249,11 @@ async function processSuccessfulPayment(reference) {
       baseAmount: transaction.amount,
       paystackStatus: paystackData.status
     });
+    // ✅ FRAUD CHECK
     if (Math.abs(actualAmountPaid - expectedAmount) > 0.02) {
-      console.error(`🚨 FRAUD DETECTED - Amount mismatch!`, {
-        reference,
-        expectedAmount,
-        actualAmountPaid,
+      console.error(`🚨 FRAUD DETECTED!`, {
+        reference, expectedAmount, actualAmountPaid,
         difference: actualAmountPaid - expectedAmount,
-        baseAmount: transaction.amount,
         userId: transaction.userId
       });
       transaction.status = 'failed';
@@ -265,27 +261,25 @@ async function processSuccessfulPayment(reference) {
       transaction.metadata = {
         ...transaction.metadata,
         fraudDetected: true,
-        fraudReason: 'Amount mismatch - possible fraud attempt',
-        expectedAmount: expectedAmount,
-        actualAmountPaid: actualAmountPaid,
+        fraudReason: 'Amount mismatch - fraud attempt',
+        expectedAmount,
+        actualAmountPaid,
         fraudDetectedAt: new Date(),
-        paystackData: paystackData
+        paystackData
       };
       await transaction.save();
       const user = await User.findById(transaction.userId);
-      if (user) {
-        await sendFraudAlert(transaction, user);
-      }
-      return { success: false, message: 'Payment amount verification failed' };
+      if (user) await sendFraudAlert(transaction, user);
+      return { success: false, message: 'Payment verification failed' };
     }
     if (paystackData.status !== 'success') {
-      console.warn(`Payment not successful. Paystack status: ${paystackData.status}`);
+      console.warn(`Payment not successful: ${paystackData.status}`);
       transaction.status = 'failed';
       transaction.processing = false;
       transaction.metadata = {
         ...transaction.metadata,
         paystackStatus: paystackData.status,
-        paystackData: paystackData,
+        paystackData,
         failedAt: new Date()
       };
       await transaction.save();
@@ -313,11 +307,11 @@ async function processSuccessfulPayment(reference) {
     transaction.completedAt = new Date();
     transaction.metadata = {
       ...transaction.metadata,
-      paystackData: paystackData,
+      paystackData,
       verifiedAt: new Date()
     };
     await transaction.save();
-    console.log(`✅ Transaction ${reference} completed. User ${user._id} balance: ${previousBalance} -> ${user.walletBalance}`);
+    console.log(`✅ Transaction ${reference} completed. Balance: ${previousBalance} → ${user.walletBalance}`);
     await sendDepositSMS(user, transaction.amount, user.walletBalance);
     return { success: true, message: 'Deposit successful', newBalance: user.walletBalance };
   } catch (error) {
@@ -335,13 +329,14 @@ async function processSuccessfulPayment(reference) {
   }
 }
 
+// ✅ CALLBACK ROUTE
 router.get('/callback', async (req, res) => {
   try {
     const { reference } = req.query;
     if (!reference) {
       return res.redirect('https://www.datahustle.shop/payment/callback?error=no_reference');
     }
-    console.log(`Payment callback received for reference: ${reference}`);
+    console.log(`📥 Callback received: ${reference}`);
     try {
       const paystackResponse = await axios.get(
         `${PAYSTACK_BASE_URL}/transaction/verify/${reference}`,
@@ -355,20 +350,17 @@ router.get('/callback', async (req, res) => {
       const paystackData = paystackResponse.data.data;
       const transaction = await Transaction.findOne({ reference });
       if (!transaction) {
+        console.error(`Transaction not found: ${reference}`);
         return res.redirect(`https://www.datahustle.shop/payment/callback?reference=${reference}`);
       }
       if (paystackData.status !== 'success') {
+        console.warn(`Paystack status not success: ${paystackData.status}`);
         return res.redirect(`https://www.datahustle.shop/payment/callback?reference=${reference}`);
       }
       const actualAmountPaid = paystackData.amount / 100;
       const expectedAmount = transaction.metadata?.expectedPaystackAmount || transaction.amount;
       if (Math.abs(actualAmountPaid - expectedAmount) > 0.02) {
-        console.error('🚨 FRAUD ALERT - Callback amount mismatch:', {
-          reference,
-          expectedAmount,
-          actualAmountPaid,
-          userId: transaction.userId
-        });
+        console.error('🚨 FRAUD in callback:', { reference, expectedAmount, actualAmountPaid });
         transaction.status = 'failed';
         transaction.metadata = {
           ...transaction.metadata,
@@ -380,15 +372,13 @@ router.get('/callback', async (req, res) => {
         };
         await transaction.save();
         const user = await User.findById(transaction.userId);
-        if (user) {
-          await sendFraudAlert(transaction, user);
-        }
+        if (user) await sendFraudAlert(transaction, user);
         return res.redirect(`https://www.datahustle.shop/payment/callback?reference=${reference}`);
       }
-      const result = await processSuccessfulPayment(reference);
+      await processSuccessfulPayment(reference);
       return res.redirect(`https://www.datahustle.shop/payment/callback?reference=${reference}`);
     } catch (paystackError) {
-      console.error('Paystack Verification Error in Callback:', paystackError.response?.data || paystackError.message);
+      console.error('Paystack Error in Callback:', paystackError.response?.data || paystackError.message);
       return res.redirect(`https://www.datahustle.shop/payment/callback?reference=${reference}`);
     }
   } catch (error) {
@@ -397,15 +387,11 @@ router.get('/callback', async (req, res) => {
   }
 });
 
+// ✅ WEBHOOK
 router.post('/paystack/webhook', async (req, res) => {
   try {
-    console.log('Webhook received:', {
-      signature: req.headers['x-paystack-signature'],
-      event: req.body.event,
-      reference: req.body.data?.reference
-    });
-    const secret = PAYSTACK_SECRET_KEY;
-    const hash = crypto.createHmac('sha512', secret).update(JSON.stringify(req.body)).digest('hex');
+    console.log('Webhook:', req.body.event, req.body.data?.reference);
+    const hash = crypto.createHmac('sha512', PAYSTACK_SECRET_KEY).update(JSON.stringify(req.body)).digest('hex');
     if (hash !== req.headers['x-paystack-signature']) {
       console.error('❌ Invalid webhook signature');
       return res.status(400).json({ error: 'Invalid signature' });
@@ -413,11 +399,10 @@ router.post('/paystack/webhook', async (req, res) => {
     const event = req.body;
     if (event.event === 'charge.success') {
       const { reference } = event.data;
-      console.log(`Processing successful payment: ${reference}`);
+      console.log(`Processing webhook payment: ${reference}`);
       const result = await processSuccessfulPayment(reference);
       return res.json({ message: result.message });
     } else {
-      console.log(`Unhandled event type: ${event.event}`);
       return res.json({ message: 'Event received' });
     }
   } catch (error) {
@@ -426,11 +411,12 @@ router.post('/paystack/webhook', async (req, res) => {
   }
 });
 
+// ✅ VERIFY PAYMENT
 router.get('/verify-payment', async (req, res) => {
   try {
     const { reference } = req.query;
     if (!reference) {
-      return res.status(400).json({ success: false, error: 'Reference is required' });
+      return res.status(400).json({ success: false, error: 'Reference required' });
     }
     const transaction = await Transaction.findOne({ reference });
     if (!transaction) {
@@ -439,7 +425,7 @@ router.get('/verify-payment', async (req, res) => {
     if (transaction.status === 'completed') {
       return res.json({
         success: true,
-        message: 'Payment already verified and completed',
+        message: 'Payment verified',
         data: {
           reference,
           amount: transaction.amount,
@@ -453,17 +439,17 @@ router.get('/verify-payment', async (req, res) => {
     if (transaction.status === 'pending') {
       const result = await processSuccessfulPayment(reference);
       if (result.success) {
-        const updatedTransaction = await Transaction.findOne({ reference });
+        const updated = await Transaction.findOne({ reference });
         return res.json({
           success: true,
           message: 'Payment verified successfully',
           data: {
             reference,
-            amount: updatedTransaction.amount,
+            amount: updated.amount,
             status: 'completed',
-            balanceBefore: updatedTransaction.balanceBefore,
-            balanceAfter: updatedTransaction.balanceAfter,
-            balanceChange: updatedTransaction.balanceAfter - updatedTransaction.balanceBefore,
+            balanceBefore: updated.balanceBefore,
+            balanceAfter: updated.balanceAfter,
+            balanceChange: updated.balanceAfter - updated.balanceBefore,
             newBalance: result.newBalance
           }
         });
@@ -486,6 +472,7 @@ router.get('/verify-payment', async (req, res) => {
   }
 });
 
+// ✅ USER TRANSACTIONS
 router.get('/user-transactions/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -539,6 +526,7 @@ router.get('/user-transactions/:userId', async (req, res) => {
   }
 });
 
+// ✅ VERIFY PENDING TRANSACTION
 router.post('/verify-pending-transaction/:transactionId', async (req, res) => {
   try {
     const { transactionId } = req.params;
@@ -554,26 +542,24 @@ router.post('/verify-pending-transaction/:transactionId', async (req, res) => {
           transactionId,
           reference: transaction.reference,
           amount: transaction.amount,
-          status: transaction.status,
-          balanceBefore: transaction.balanceBefore,
-          balanceAfter: transaction.balanceAfter
+          status: transaction.status
         }
       });
     }
     const result = await processSuccessfulPayment(transaction.reference);
     if (result.success) {
-      const updatedTransaction = await Transaction.findById(transactionId);
+      const updated = await Transaction.findById(transactionId);
       return res.json({
         success: true,
-        message: 'Transaction verified and completed successfully',
+        message: 'Transaction verified successfully',
         data: {
           transactionId,
-          reference: updatedTransaction.reference,
-          amount: updatedTransaction.amount,
+          reference: updated.reference,
+          amount: updated.amount,
           status: 'completed',
-          balanceBefore: updatedTransaction.balanceBefore,
-          balanceAfter: updatedTransaction.balanceAfter,
-          balanceChange: updatedTransaction.balanceAfter - updatedTransaction.balanceBefore,
+          balanceBefore: updated.balanceBefore,
+          balanceAfter: updated.balanceAfter,
+          balanceChange: updated.balanceAfter - updated.balanceBefore,
           newBalance: result.newBalance
         }
       });
@@ -585,25 +571,26 @@ router.post('/verify-pending-transaction/:transactionId', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Verify Pending Transaction Error:', error);
+    console.error('Verify Pending Error:', error);
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
 
+// ✅ FRAUD ALERTS (ADMIN)
 router.get('/admin/fraud-alerts', auth, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
     if (!user || !user.isAdmin) {
       return res.status(403).json({ error: 'Unauthorized' });
     }
-    const fraudulentTransactions = await Transaction.find({ 'metadata.fraudDetected': true })
+    const fraudTransactions = await Transaction.find({ 'metadata.fraudDetected': true })
       .populate('userId', 'name email phoneNumber')
       .sort({ createdAt: -1 })
       .limit(100);
     return res.json({
       success: true,
       data: {
-        fraudAlerts: fraudulentTransactions.map(tx => ({
+        fraudAlerts: fraudTransactions.map(tx => ({
           reference: tx.reference,
           user: tx.userId,
           amount: tx.amount,
@@ -614,7 +601,7 @@ router.get('/admin/fraud-alerts', auth, async (req, res) => {
           createdAt: tx.createdAt,
           ip: tx.metadata.ip
         })),
-        total: fraudulentTransactions.length
+        total: fraudTransactions.length
       }
     });
   } catch (error) {
