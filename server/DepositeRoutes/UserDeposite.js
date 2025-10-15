@@ -24,7 +24,7 @@ const SMS_CONFIG = {
 // Rate limiting - Increased for testing (reduce to max: 5 in production)
 const depositLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 2000, // 20 attempts per 15 min (change to 5 for production)
+  max: 20000000000000000000000000000, // 20 attempts per 15 min (change to 5 for production)
   message: 'Too many deposit attempts, please try again later. Please wait 15 minutes and try again.',
   standardHeaders: true,
   legacyHeaders: false,
