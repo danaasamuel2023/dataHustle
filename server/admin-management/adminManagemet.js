@@ -427,7 +427,7 @@ router.delete('/users/:id',auth, adminAuth, async (req, res) => {
  * @desc    Get all data purchase orders
  * @access  Admin
  */
-router.get('/orders',auth, adminAuth, async (req, res) => {
+router.get('/orders', auth, adminAuth, async (req, res) => {
   try {
     const { 
       page = 1, 
@@ -436,7 +436,9 @@ router.get('/orders',auth, adminAuth, async (req, res) => {
       network = '',
       startDate = '',
       endDate = '',
-      phoneNumber = ''
+      phoneNumber = '',
+      reference = '',
+      capacity = ''
     } = req.query;
     
     // Build filter
@@ -444,7 +446,51 @@ router.get('/orders',auth, adminAuth, async (req, res) => {
     
     if (status) filter.status = status;
     if (network) filter.network = network;
-    if (phoneNumber) filter.phoneNumber = { $regex: phoneNumber };
+    if (capacity) filter.capacity = parseInt(capacity);
+    
+    // Enhanced phone search - searches both order phone AND buyer's phone
+    if (phoneNumber) {
+      const cleanPhone = phoneNumber.replace(/\D/g, '');
+      
+      // First, find all users with matching phone numbers
+      const matchingUsers = await User.find({
+        phoneNumber: { $regex: cleanPhone }
+      }).select('_id');
+      
+      const userIds = matchingUsers.map(user => user._id);
+      
+      // Search in both order phone number and user IDs
+      filter.$or = [
+        { phoneNumber: { $regex: cleanPhone } },
+        { userId: { $in: userIds } }
+      ];
+    }
+    
+    // Reference search (searches both geonetReference and _id)
+    if (reference) {
+      const referenceFilter = { $or: [] };
+      
+      // Search in geonetReference
+      referenceFilter.$or.push({ 
+        geonetReference: { $regex: reference, $options: 'i' } 
+      });
+      
+      // If it's a valid ObjectId, also search by _id
+      if (mongoose.Types.ObjectId.isValid(reference)) {
+        referenceFilter.$or.push({ _id: reference });
+      }
+      
+      // Merge with existing filter
+      if (filter.$or) {
+        filter.$and = [
+          { $or: filter.$or },
+          referenceFilter
+        ];
+        delete filter.$or;
+      } else {
+        filter.$or = referenceFilter.$or;
+      }
+    }
     
     // Date range filter
     if (startDate || endDate) {
@@ -452,11 +498,12 @@ router.get('/orders',auth, adminAuth, async (req, res) => {
       if (startDate) filter.createdAt.$gte = new Date(startDate);
       if (endDate) {
         const endDateObj = new Date(endDate);
-        endDateObj.setDate(endDateObj.getDate() + 1); // Include end date until midnight
+        endDateObj.setDate(endDateObj.getDate() + 1);
         filter.createdAt.$lte = endDateObj;
       }
     }
     
+    // Get orders with filter
     const orders = await DataPurchase.find(filter)
       .populate('userId', 'name email phoneNumber')
       .limit(parseInt(limit))
@@ -467,8 +514,7 @@ router.get('/orders',auth, adminAuth, async (req, res) => {
     
     // Calculate total revenue from filtered orders
     const revenue = await DataPurchase.aggregate([
-      { $match: filter },
-      { $match: { status: 'completed' } },
+      { $match: { ...filter, status: 'completed' } },
       { $group: { _id: null, total: { $sum: '$price' } } }
     ]);
     
@@ -480,7 +526,7 @@ router.get('/orders',auth, adminAuth, async (req, res) => {
       totalRevenue: revenue.length > 0 ? revenue[0].total : 0
     });
   } catch (err) {
-    console.error(err.message);
+    console.error('Error fetching orders:', err.message);
     res.status(500).send('Server Error');
   }
 });
