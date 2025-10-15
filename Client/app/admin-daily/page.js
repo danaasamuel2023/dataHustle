@@ -2,20 +2,18 @@
 
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Calendar, ArrowUp, ArrowDown, Database, Users, Activity, RefreshCw } from 'lucide-react';
-import { useRouter } from 'next/navigation'; // Import for navigation
+import { Calendar, ArrowUp, ArrowDown, Database, Users, Activity, RefreshCw, TrendingUp, Award, DollarSign } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 // Fetch dashboard data
 const getDashboardData = async (date) => {
   try {
-    // Get auth token from localStorage (only available on client-side)
     const authToken = localStorage.getItem('authToken');
     
     if (!authToken) {
       throw new Error('Authentication token not found');
     }
     
-    // Replace with your actual API endpoint
     const response = await fetch(`https://datahustle.onrender.com/api/daily-summary?date=${date}`, {
       headers: {
         'x-auth-token': authToken
@@ -23,11 +21,9 @@ const getDashboardData = async (date) => {
     });
     
     if (!response.ok) {
-      // Handle 401 Unauthorized error
       if (response.status === 401) {
         const userData = JSON.parse(localStorage.getItem('userData'));
         if (!userData || userData.role !== 'admin') {
-          // Redirect non-admin users on 401
           throw new Error('unauthorized-redirect');
         }
       }
@@ -36,7 +32,6 @@ const getDashboardData = async (date) => {
     
     const data = await response.json();
     
-    // Store user info if provided
     if (data.user) {
       localStorage.setItem('userData', JSON.stringify({
         id: data.user._id,
@@ -49,39 +44,6 @@ const getDashboardData = async (date) => {
     return data;
   } catch (error) {
     console.error('Error fetching dashboard data:', error);
-    // Return mock data as fallback for preview purposes
-    if (error.message !== 'unauthorized-redirect') {
-      return {
-        date: date,
-        summary: {
-          totalOrders: 45,
-          totalRevenue: 2350.75,
-          totalDeposits: 3100.25,
-          totalCapacityGB: 125,
-          uniqueCustomers: 32
-        },
-        networkSummary: [
-          { network: 'YELLO', count: 25, totalGB: 62, revenue: 1200.50 },
-          { network: 'TELECEL', count: 15, totalGB: 45, revenue: 850.25 },
-          { network: 'AT_PREMIUM', count: 5, totalGB: 18, revenue: 300.00 }
-        ],
-        capacityDetails: [
-          { network: 'YELLO', capacity: 1, count: 5, totalGB: 5 },
-          { network: 'YELLO', capacity: 2, count: 10, totalGB: 20 },
-          { network: 'YELLO', capacity: 5, count: 6, totalGB: 30 },
-          { network: 'TELECEL', capacity: 2, count: 7, totalGB: 14 },
-          { network: 'TELECEL', capacity: 5, count: 3, totalGB: 15 },
-          { network: 'AT_PREMIUM', capacity: 3, count: 3, totalGB: 9 },
-          { network: 'AT_PREMIUM', capacity: 5, count: 1, totalGB: 5 }
-        ],
-        statusSummary: [
-          { status: 'completed', count: 38 },
-          { status: 'pending', count: 5 },
-          { status: 'processing', count: 2 }
-        ]
-      };
-    }
-    // Re-throw the error to handle in component
     throw error;
   }
 };
@@ -92,9 +54,8 @@ const DailyDashboard = () => {
   const [error, setError] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [refreshing, setRefreshing] = useState(false);
-  const router = useRouter(); // Initialize router for navigation
+  const router = useRouter();
   
-  // Format currency for display (GHS - Ghanaian Cedi)
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-GH', {
       style: 'currency',
@@ -112,7 +73,7 @@ const DailyDashboard = () => {
     } catch (err) {
       console.error('Failed to refresh data:', err);
       if (err.message === 'unauthorized-redirect') {
-        router.push('/'); // Redirect to home page on auth error
+        router.push('/');
       } else {
         setError(err.message);
       }
@@ -130,7 +91,7 @@ const DailyDashboard = () => {
         setError(null);
       } catch (err) {
         if (err.message === 'unauthorized-redirect') {
-          router.push('/'); // Redirect to home page on auth error
+          router.push('/');
         } else {
           setError(err.message);
         }
@@ -142,45 +103,33 @@ const DailyDashboard = () => {
     fetchData();
   }, [selectedDate, router]);
   
-  // Array of colors for the charts
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
   
-  // Status colors for better visualization
   const STATUS_COLORS = {
-    'completed': '#4ade80', // Green
-    'pending': '#f97316',   // Orange
-    'processing': '#3b82f6', // Blue
-    'failed': '#ef4444',    // Red
-    'waiting': '#a855f7',   // Purple
-    'delivered': '#14b8a6'  // Teal
+    'completed': '#4ade80',
+    'pending': '#f97316',
+    'processing': '#3b82f6',
+    'failed': '#ef4444',
+    'waiting': '#a855f7',
+    'delivered': '#14b8a6'
   };
   
-  // Loading state with skeleton UI
   if (loading) return (
-    <div className="p-6 bg-gray-50 min-h-screen animate-pulse">
-      <div className="h-8 bg-gray-200 rounded w-64 mb-6"></div>
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-        {[...Array(5)].map((_, i) => (
-          <div key={i} className="bg-gray-200 p-6 rounded-lg h-28"></div>
+    <div className="p-6 bg-gray-50 dark:bg-gray-900 min-h-screen animate-pulse">
+      <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-64 mb-6"></div>
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="bg-gray-200 dark:bg-gray-700 p-6 rounded-lg h-28"></div>
         ))}
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="bg-gray-200 p-6 rounded-lg h-64"></div>
-        <div className="bg-gray-200 p-6 rounded-lg h-64"></div>
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="bg-gray-200 p-6 rounded-lg h-80"></div>
-        <div className="bg-gray-200 p-6 rounded-lg h-80"></div>
       </div>
     </div>
   );
   
-  // Error state
   if (error) return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg p-4 mb-6">
+    <div className="p-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
+      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-400 rounded-lg p-4 mb-6">
         <div className="flex items-center">
-          <svg className="w-5 h-5 mr-2 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+          <svg className="w-5 h-5 mr-2 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
           </svg>
           <h3 className="text-lg font-medium">Error loading dashboard data</h3>
@@ -199,16 +148,14 @@ const DailyDashboard = () => {
   );
   
   if (!data) return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg p-4">
+    <div className="p-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
+      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-400 rounded-lg p-4">
         No data available. Please try another date.
       </div>
     </div>
   );
   
-  // Prepare data for the capacity breakdown chart
   const prepareCapacityBreakdown = () => {
-    // Group capacity details by capacity size
     const capacityGroups = {};
     data.capacityDetails.forEach(item => {
       if (!capacityGroups[item.capacity]) {
@@ -228,23 +175,23 @@ const DailyDashboard = () => {
   const capacityBreakdown = prepareCapacityBreakdown();
   
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
+    <div className="p-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
       <div className="mb-6 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Daily Business Summary</h1>
-          <p className="text-gray-600 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Daily Business Summary</h1>
+          <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
             View your daily metrics, sales, and performance indicators
           </p>
         </div>
         
         <div className="flex items-center space-x-4">
-          <div className="flex items-center bg-white rounded-lg shadow-sm border border-gray-200 p-2">
-            <Calendar className="h-5 w-5 text-gray-500 mr-2" />
+          <div className="flex items-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-2">
+            <Calendar className="h-5 w-5 text-gray-500 dark:text-gray-400 mr-2" />
             <input
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="text-sm focus:outline-none"
+              className="text-sm focus:outline-none bg-transparent dark:text-white"
               aria-label="Select date"
             />
           </div>
@@ -254,8 +201,8 @@ const DailyDashboard = () => {
             disabled={refreshing}
             className={`flex items-center space-x-2 py-2 px-4 rounded-lg ${
               refreshing 
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                : 'bg-blue-600 text-white hover:bg-blue-700'
+                ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed' 
+                : 'bg-yellow-500 text-white hover:bg-yellow-600'
             } transition-colors duration-200 shadow-sm`}
           >
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -265,120 +212,216 @@ const DailyDashboard = () => {
       </div>
       
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 transition-all duration-200 hover:shadow-md">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-4 transition-all duration-200 hover:shadow-md">
           <div className="flex justify-between items-center mb-3">
-            <h3 className="text-sm text-gray-500 font-medium">Total Orders</h3>
-            <div className="p-2 bg-blue-50 rounded-lg">
-              <Activity className="h-5 w-5 text-blue-500" />
+            <h3 className="text-sm text-gray-500 dark:text-gray-400 font-medium">Total Orders</h3>
+            <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+              <Activity className="h-5 w-5 text-yellow-600" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-gray-800">{data.summary.totalOrders}</p>
-          <div className="mt-2 text-xs text-gray-500">
-            {data.date}
+          <p className="text-2xl font-bold text-gray-800 dark:text-white">{data.summary.totalOrders}</p>
+          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">{data.date}</div>
+        </div>
+        
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-4 transition-all duration-200 hover:shadow-md">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-sm text-gray-500 dark:text-gray-400 font-medium">Total Revenue</h3>
+            <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
+              <TrendingUp className="h-5 w-5 text-green-600" />
+            </div>
+          </div>
+          <p className="text-2xl font-bold text-gray-800 dark:text-white">{formatCurrency(data.summary.totalRevenue)}</p>
+          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">{data.date}</div>
+        </div>
+        
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-4 transition-all duration-200 hover:shadow-md">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-sm text-gray-500 dark:text-gray-400 font-medium">Total Deposits</h3>
+            <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+              <ArrowDown className="h-5 w-5 text-purple-600" />
+            </div>
+          </div>
+          <p className="text-2xl font-bold text-gray-800 dark:text-white">{formatCurrency(data.summary.totalDeposits)}</p>
+          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">{data.date}</div>
+        </div>
+        
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-4 transition-all duration-200 hover:shadow-md">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-sm text-gray-500 dark:text-gray-400 font-medium">Paystack</h3>
+            <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <DollarSign className="h-5 w-5 text-blue-600" />
+            </div>
+          </div>
+          <p className="text-2xl font-bold text-gray-800 dark:text-white">{formatCurrency(data.summary.paystackDeposits.amount)}</p>
+          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">{data.summary.paystackDeposits.count} deposits</div>
+        </div>
+        
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-4 transition-all duration-200 hover:shadow-md">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-sm text-gray-500 dark:text-gray-400 font-medium">Data Sold</h3>
+            <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+              <Database className="h-5 w-5 text-yellow-600" />
+            </div>
+          </div>
+          <p className="text-2xl font-bold text-gray-800 dark:text-white">{data.summary.totalCapacityGB} <span className="text-sm font-normal">GB</span></p>
+          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">{data.date}</div>
+        </div>
+        
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-4 transition-all duration-200 hover:shadow-md">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-sm text-gray-500 dark:text-gray-400 font-medium">Unique Customers</h3>
+            <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+              <Users className="h-5 w-5 text-indigo-600" />
+            </div>
+          </div>
+          <p className="text-2xl font-bold text-gray-800 dark:text-white">{data.summary.uniqueCustomers}</p>
+          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">{data.date}</div>
+        </div>
+      </div>
+      
+      {/* Top Performers Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Top Depositors */}
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-6 transition-all duration-200 hover:shadow-md">
+          <div className="flex items-center mb-4">
+            <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg mr-3">
+              <Award className="h-6 w-6 text-green-600" />
+            </div>
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Top 5 Depositors</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead>
+                <tr>
+                  <th className="px-4 py-3 bg-gray-50 dark:bg-gray-900 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">#</th>
+                  <th className="px-4 py-3 bg-gray-50 dark:bg-gray-900 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Customer</th>
+                  <th className="px-4 py-3 bg-gray-50 dark:bg-gray-900 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Amount</th>
+                  <th className="px-4 py-3 bg-gray-50 dark:bg-gray-900 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Deposits</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {data.topDepositors && data.topDepositors.length > 0 ? (
+                  data.topDepositors.map((depositor, index) => (
+                    <tr key={depositor.userId} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                        {index === 0 && '🥇'}
+                        {index === 1 && '🥈'}
+                        {index === 2 && '🥉'}
+                        {index > 2 && `${index + 1}`}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">{depositor.userName}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{depositor.userPhone}</div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-green-600 dark:text-green-400 text-right">
+                        {formatCurrency(depositor.totalDeposited)}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-right">
+                        {depositor.depositCount}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4" className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                      No deposits today
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
         
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 transition-all duration-200 hover:shadow-md">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="text-sm text-gray-500 font-medium">Total Revenue</h3>
-            <div className="p-2 bg-green-50 rounded-lg">
-              <ArrowUp className="h-5 w-5 text-green-500" />
+        {/* Top Customers by Orders */}
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-6 transition-all duration-200 hover:shadow-md">
+          <div className="flex items-center mb-4">
+            <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg mr-3">
+              <Award className="h-6 w-6 text-yellow-600" />
             </div>
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Top 5 Customers by Orders</h2>
           </div>
-          <p className="text-2xl font-bold text-gray-800">{formatCurrency(data.summary.totalRevenue)}</p>
-          <div className="mt-2 text-xs text-gray-500">
-            {data.date}
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 transition-all duration-200 hover:shadow-md">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="text-sm text-gray-500 font-medium">Total Deposits</h3>
-            <div className="p-2 bg-purple-50 rounded-lg">
-              <ArrowDown className="h-5 w-5 text-purple-500" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-gray-800">{formatCurrency(data.summary.totalDeposits)}</p>
-          <div className="mt-2 text-xs text-gray-500">
-            {data.date}
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 transition-all duration-200 hover:shadow-md">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="text-sm text-gray-500 font-medium">Data Sold</h3>
-            <div className="p-2 bg-yellow-50 rounded-lg">
-              <Database className="h-5 w-5 text-yellow-500" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-gray-800">{data.summary.totalCapacityGB} <span className="text-sm font-normal">GB</span></p>
-          <div className="mt-2 text-xs text-gray-500">
-            {data.date}
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 transition-all duration-200 hover:shadow-md">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="text-sm text-gray-500 font-medium">Unique Customers</h3>
-            <div className="p-2 bg-indigo-50 rounded-lg">
-              <Users className="h-5 w-5 text-indigo-500" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-gray-800">{data.summary.uniqueCustomers}</p>
-          <div className="mt-2 text-xs text-gray-500">
-            {data.date}
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead>
+                <tr>
+                  <th className="px-4 py-3 bg-gray-50 dark:bg-gray-900 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">#</th>
+                  <th className="px-4 py-3 bg-gray-50 dark:bg-gray-900 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Customer</th>
+                  <th className="px-4 py-3 bg-gray-50 dark:bg-gray-900 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Orders</th>
+                  <th className="px-4 py-3 bg-gray-50 dark:bg-gray-900 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Spent</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {data.topCustomersByOrders && data.topCustomersByOrders.length > 0 ? (
+                  data.topCustomersByOrders.map((customer, index) => (
+                    <tr key={customer.userId} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                        {index === 0 && '🥇'}
+                        {index === 1 && '🥈'}
+                        {index === 2 && '🥉'}
+                        {index > 2 && `${index + 1}`}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">{customer.userName}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{customer.userPhone}</div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-yellow-600 dark:text-yellow-400 text-right">
+                        {customer.orderCount}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white text-right">
+                        {formatCurrency(customer.totalSpent)}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4" className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                      No orders today
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
       
       {/* Network Summary */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 transition-all duration-200 hover:shadow-md">
-          <h2 className="text-lg font-semibold mb-4 text-gray-800">Network Performance</h2>
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-6 transition-all duration-200 hover:shadow-md">
+          <h2 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Network Performance</h2>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead>
                 <tr>
-                  <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider rounded-tl-lg">Network</th>
-                  <th className="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Orders</th>
-                  <th className="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Data (GB)</th>
-                  <th className="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider rounded-tr-lg">Revenue</th>
+                  <th className="px-6 py-3 bg-gray-50 dark:bg-gray-900 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider rounded-tl-lg">Network</th>
+                  <th className="px-6 py-3 bg-gray-50 dark:bg-gray-900 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Orders</th>
+                  <th className="px-6 py-3 bg-gray-50 dark:bg-gray-900 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Data (GB)</th>
+                  <th className="px-6 py-3 bg-gray-50 dark:bg-gray-900 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider rounded-tr-lg">Revenue</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {data.networkSummary.map((item, index) => (
-                  <tr key={index} className="hover:bg-gray-50 transition-colors duration-150">
+                  <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
-                        <span className="text-sm font-medium text-gray-900">{item.network}</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{item.network}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{item.count}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{item.totalGB}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">{formatCurrency(item.revenue)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-right">{item.count}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-right">{item.totalGB}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white text-right">{formatCurrency(item.revenue)}</td>
                   </tr>
                 ))}
-                <tr className="bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">Total</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">
-                    {data.networkSummary.reduce((sum, item) => sum + item.count, 0)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">
-                    {data.networkSummary.reduce((sum, item) => sum + item.totalGB, 0)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">
-                    {formatCurrency(data.networkSummary.reduce((sum, item) => sum + item.revenue, 0))}
-                  </td>
-                </tr>
               </tbody>
             </table>
           </div>
         </div>
         
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 transition-all duration-200 hover:shadow-md">
-          <h2 className="text-lg font-semibold mb-4 text-gray-800">Network Distribution</h2>
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-6 transition-all duration-200 hover:shadow-md">
+          <h2 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Network Distribution</h2>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -407,14 +450,11 @@ const DailyDashboard = () => {
       
       {/* Data Capacity Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 transition-all duration-200 hover:shadow-md">
-          <h2 className="text-lg font-semibold mb-4 text-gray-800">Data Package Distribution</h2>
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-6 transition-all duration-200 hover:shadow-md">
+          <h2 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Data Package Distribution</h2>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={capacityBreakdown}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-              >
+              <BarChart data={capacityBreakdown} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="capacity" />
                 <YAxis />
@@ -430,95 +470,31 @@ const DailyDashboard = () => {
           </div>
         </div>
         
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 transition-all duration-200 hover:shadow-md">
-          <h2 className="text-lg font-semibold mb-4 text-gray-800">Package Details By Network</h2>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead>
-                <tr>
-                  <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider rounded-tl-lg">Network</th>
-                  <th className="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Package Size</th>
-                  <th className="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Orders</th>
-                  <th className="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider rounded-tr-lg">Total Data</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {data.capacityDetails.map((item, index) => (
-                  <tr key={index} className="hover:bg-gray-50 transition-colors duration-150">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="w-3 h-3 rounded-full mr-2" style={{ 
-                          backgroundColor: COLORS[data.networkSummary.findIndex(n => n.network === item.network) % COLORS.length] 
-                        }}></div>
-                        <span className="text-sm font-medium text-gray-900">{item.network}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{item.capacity} GB</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{item.count}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">{item.totalGB} GB</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-6 transition-all duration-200 hover:shadow-md">
+          <h2 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Order Status Summary</h2>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data.statusSummary} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="status" />
+                <YAxis />
+                <Tooltip 
+                  formatter={(value) => [`${value} orders`, 'Count']}
+                  contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '8px', border: '1px solid #f0f0f0' }}
+                />
+                <Legend />
+                <Bar dataKey="count" name="Orders" radius={[4, 4, 0, 0]}>
+                  {data.statusSummary.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.status] || '#82ca9d'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
       </div>
       
-      {/* Order Status */}
-      <div className="grid grid-cols-1 mb-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 transition-all duration-200 hover:shadow-md">
-          <h2 className="text-lg font-semibold mb-4 text-gray-800">Order Status Summary</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={data.statusSummary}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="status" />
-                  <YAxis />
-                  <Tooltip 
-                    formatter={(value) => [`${value} orders`, 'Count']}
-                    contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '8px', border: '1px solid #f0f0f0' }}
-                  />
-                  <Legend />
-                  <Bar dataKey="count" name="Orders" radius={[4, 4, 0, 0]}>
-                    {data.statusSummary.map((entry, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={STATUS_COLORS[entry.status] || '#82ca9d'} 
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            
-            <div className="flex flex-col justify-center">
-              <div className="grid grid-cols-2 gap-4">
-                {data.statusSummary.map((item, index) => (
-                  <div key={index} className="bg-gray-50 rounded-lg p-4 flex items-center">
-                    <div 
-                      className="w-4 h-4 rounded-full mr-3" 
-                      style={{ backgroundColor: STATUS_COLORS[item.status] || '#82ca9d' }}
-                    ></div>
-                    <div>
-                      <div className="text-sm font-medium capitalize">{item.status}</div>
-                      <div className="text-2xl font-bold">{item.count}</div>
-                      <div className="text-xs text-gray-500">
-                        {((item.count / data.summary.totalOrders) * 100).toFixed(1)}% of total
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <div className="text-center text-xs text-gray-500 mt-8">
+      <div className="text-center text-xs text-gray-500 dark:text-gray-400 mt-8">
         <p>Data last updated: {new Date().toLocaleString()}</p>
       </div>
     </div>

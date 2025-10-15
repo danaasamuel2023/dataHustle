@@ -1376,7 +1376,6 @@ router.put('/users/:id/toggle-status', auth, adminAuth, async (req, res) => {
     });
   }
 });
-
 router.get('/daily-summary', auth, adminAuth, async (req, res) => {
   try {
     const { date = new Date().toISOString().split('T')[0] } = req.query;
@@ -1404,12 +1403,79 @@ router.get('/daily-summary', auth, adminAuth, async (req, res) => {
     ]);
     const totalRevenue = revenueAgg.length > 0 ? revenueAgg[0].totalRevenue : 0;
     
-    // Get total deposits
+    // Get total deposits (all gateways)
     const depositsAgg = await Transaction.aggregate([
       { $match: { ...dateFilter, type: 'deposit', status: 'completed' } },
       { $group: { _id: null, totalDeposits: { $sum: '$amount' } } }
     ]);
     const totalDeposits = depositsAgg.length > 0 ? depositsAgg[0].totalDeposits : 0;
+    
+    // Get Paystack deposits specifically
+    const paystackDepositsAgg = await Transaction.aggregate([
+      { $match: { ...dateFilter, type: 'deposit', status: 'completed', gateway: 'paystack' } },
+      { $group: { _id: null, totalPaystackDeposits: { $sum: '$amount' }, count: { $sum: 1 } } }
+    ]);
+    const paystackDeposits = paystackDepositsAgg.length > 0 ? paystackDepositsAgg[0] : { totalPaystackDeposits: 0, count: 0 };
+    
+    // Get top 5 depositors
+    const topDepositorsAgg = await Transaction.aggregate([
+      { $match: { ...dateFilter, type: 'deposit', status: 'completed' } },
+      { 
+        $group: { 
+          _id: '$userId',
+          totalDeposited: { $sum: '$amount' },
+          depositCount: { $sum: 1 }
+        }
+      },
+      { $sort: { totalDeposited: -1 } },
+      { $limit: 5 }
+    ]);
+    
+    // Populate user details for top depositors
+    const topDepositors = await Promise.all(
+      topDepositorsAgg.map(async (item) => {
+        const user = await User.findById(item._id).select('name email phoneNumber');
+        return {
+          userId: item._id,
+          userName: user ? user.name : 'Unknown',
+          userEmail: user ? user.email : 'N/A',
+          userPhone: user ? user.phoneNumber : 'N/A',
+          totalDeposited: item.totalDeposited,
+          depositCount: item.depositCount
+        };
+      })
+    );
+    
+    // Get top 5 customers by order count
+    const topCustomersByOrdersAgg = await DataPurchase.aggregate([
+      { $match: dateFilter },
+      { 
+        $group: { 
+          _id: '$userId',
+          orderCount: { $sum: 1 },
+          totalSpent: { $sum: '$price' },
+          totalDataGB: { $sum: '$capacity' }
+        }
+      },
+      { $sort: { orderCount: -1 } },
+      { $limit: 5 }
+    ]);
+    
+    // Populate user details for top customers
+    const topCustomersByOrders = await Promise.all(
+      topCustomersByOrdersAgg.map(async (item) => {
+        const user = await User.findById(item._id).select('name email phoneNumber');
+        return {
+          userId: item._id,
+          userName: user ? user.name : 'Unknown',
+          userEmail: user ? user.email : 'N/A',
+          userPhone: user ? user.phoneNumber : 'N/A',
+          orderCount: item.orderCount,
+          totalSpent: item.totalSpent,
+          totalDataGB: item.totalDataGB
+        };
+      })
+    );
     
     // Get total data capacity sold for each network & capacity
     const capacityByNetworkAgg = await DataPurchase.aggregate([
@@ -1490,12 +1556,18 @@ router.get('/daily-summary', auth, adminAuth, async (req, res) => {
         totalOrders,
         totalRevenue,
         totalDeposits,
+        paystackDeposits: {
+          amount: paystackDeposits.totalPaystackDeposits,
+          count: paystackDeposits.count
+        },
         totalCapacityGB: totalCapacity,
         uniqueCustomers
       },
       networkSummary,
       capacityDetails: capacityData,
-      statusSummary
+      statusSummary,
+      topDepositors,
+      topCustomersByOrders
     });
     
   } catch (err) {
