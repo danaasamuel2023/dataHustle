@@ -17,7 +17,7 @@ const FEE_PERCENTAGE = 0.03; // 3% fee (Paystack charges + your fee)
 // mNotify SMS configuration
 const SMS_CONFIG = {
   API_KEY: process.env.MNOTIFY_API_KEY || 'w3rGWhv4e235nDwYvD5gVDyrW',
-  SENDER_ID: 'DataHustleGH',
+  SENDER_ID: 'DataHustle',
   BASE_URL: 'https://apps.mnotify.net/smsapi'
 };
 
