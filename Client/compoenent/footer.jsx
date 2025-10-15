@@ -1,148 +1,145 @@
-// components/Footer.jsx
 'use client'
 import React from 'react';
 import Link from 'next/link';
-import { ArrowRight, Zap, Star, Flame } from 'lucide-react';
+import { ArrowRight, Zap } from 'lucide-react';
 
 const Footer = () => {
-  return (
-    <footer className="bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-20 -right-20 w-40 h-40 rounded-full bg-gradient-to-br from-emerald-400/5 to-teal-400/5 blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-20 -left-20 w-40 h-40 rounded-full bg-gradient-to-br from-purple-400/5 to-pink-400/5 blur-3xl animate-pulse delay-1000"></div>
-      </div>
+  const currentYear = new Date().getFullYear();
+  
+  const navigationLinks = [
+    { label: 'Dashboard', href: '/' },
+    { label: 'Orders', href: '/orders' },
+    { label: 'Transactions', href: '/myorders' },
+    { label: 'Profile', href: '/profile' }
+  ];
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {/* Brand Section */}
+  const services = [
+    { label: 'MTN Data', href: '/mtnup2u' },
+    { label: 'AirtelTigo Data', href: '/at-ishare' },
+    { label: 'Telecel Data', href: '/TELECEL' }
+  ];
+
+  const legalLinks = [
+    { label: 'Privacy Policy', href: '/privacy' },
+    { label: 'Terms of Service', href: '/terms' }
+  ];
+
+  return (
+    <footer className="bg-gray-900 border-t border-gray-800">
+      <div className="max-w-7xl mx-auto px-4 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
+          {/* Company info */}
           <div className="lg:col-span-1">
-            <div className="mb-6">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-xl relative">
-                  <Zap className="w-6 h-6 text-white" strokeWidth={2.5} />
-                  <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
-                    <Star className="w-2 h-2 text-white" strokeWidth={3} />
-                  </div>
-                </div>
-                <h2 className="text-3xl font-black bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 text-transparent bg-clip-text">
-                  DATAHUSTLE
-                </h2>
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center">
+                <Zap className="w-5 h-5 text-white" strokeWidth={2.5} />
               </div>
-              <p className="text-white/70 font-medium text-lg mb-6">
-                Where Hustlers Meet Success. Your premium data marketplace for unlimited possibilities.
-              </p>
-              
-              {/* Social Media Links */}
-              <div className="flex space-x-4">
-                {[
-                  { platform: 'twitter', icon: TwitterIcon },
-                  { platform: 'instagram', icon: InstagramIcon },
-                  { platform: 'facebook', icon: FacebookIcon },
-                  { platform: 'linkedin', icon: LinkedInIcon }
-                ].map(({ platform, icon: Icon }) => (
-                  <a 
-                    key={platform}
-                    href="#" 
-                    className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-sm hover:bg-white/20 border border-white/20 flex items-center justify-center transition-all duration-300 transform hover:scale-110 group"
-                  >
-                    <Icon className="w-5 h-5 text-emerald-400 group-hover:text-emerald-300" />
-                  </a>
-                ))}
-              </div>
+              <span className="text-xl font-semibold text-white">
+                DATAHUSTLE
+              </span>
+            </div>
+            <p className="text-gray-400 text-sm leading-relaxed mb-6">
+              Your trusted platform for mobile data services. Fast, reliable, and secure transactions.
+            </p>
+            
+            {/* Social links */}
+            <div className="flex gap-3">
+              {[
+                { name: 'Twitter', icon: TwitterIcon },
+                { name: 'Facebook', icon: FacebookIcon },
+                { name: 'Instagram', icon: InstagramIcon },
+                { name: 'LinkedIn', icon: LinkedInIcon }
+              ].map(({ name, icon: Icon }) => (
+                <a 
+                  key={name}
+                  href="#" 
+                  className="w-9 h-9 rounded-lg bg-gray-800 hover:bg-gray-700 flex items-center justify-center transition-colors"
+                  aria-label={name}
+                >
+                  <Icon className="w-4 h-4 text-gray-400" />
+                </a>
+              ))}
             </div>
           </div>
           
-          {/* Quick Links */}
+          {/* Navigation */}
           <div>
-            <h3 className="text-2xl font-black text-white mb-6 flex items-center">
-              <div className="w-2 h-8 bg-gradient-to-b from-emerald-400 to-teal-500 rounded-full mr-3"></div>
-              Quick Links
+            <h3 className="text-sm font-semibold text-white mb-4 uppercase tracking-wider">
+              Navigation
             </h3>
-            <ul className="space-y-4">
-              {[
-                { name: 'Dashboard', path: '/' },
-                { name: 'Orders', path: '/orders' },
-                { name: 'Transactions', path: '/myorders' },
-                { name: 'Profile', path: '/profile' }
-              ].map((link) => (
-                <li key={link.name}>
+            <ul className="space-y-3">
+              {navigationLinks.map((link) => (
+                <li key={link.label}>
                   <Link 
-                    href={link.path} 
-                    className="group flex items-center text-white/70 hover:text-emerald-400 transition-all duration-300 font-medium"
+                    href={link.href} 
+                    className="text-gray-400 hover:text-white text-sm transition-colors inline-flex items-center"
                   >
-                    <div className="w-6 h-6 rounded-lg bg-white/5 group-hover:bg-emerald-500/20 flex items-center justify-center mr-3 transition-all duration-300">
-                      <ArrowRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity text-emerald-400" />
-                    </div>
-                    <span className="group-hover:translate-x-1 transition-transform duration-300">{link.name}</span>
+                    {link.label}
                   </Link>
                 </li>
               ))}
             </ul>
           </div>
           
-          {/* Data Services */}
+          {/* Services */}
           <div>
-            <h3 className="text-2xl font-black text-white mb-6 flex items-center">
-              <div className="w-2 h-8 bg-gradient-to-b from-teal-400 to-cyan-500 rounded-full mr-3"></div>
-              Our Services
+            <h3 className="text-sm font-semibold text-white mb-4 uppercase tracking-wider">
+              Services
             </h3>
-            <ul className="space-y-4">
-              {[
-                { name: 'MTN Data', path: '/mtnup2u', color: 'yellow' },
-                { name: 'AirtelTigo Data', path: '/at-ishare', color: 'blue' },
-                { name: 'Telecel Data', path: '/TELECEL', color: 'red', isNew: true },
-                // { name: 'Foreign Numbers', path: '/verification-services', color: 'purple' }
-              ].map((service) => (
-                <li key={service.name}>
+            <ul className="space-y-3">
+              {services.map((service) => (
+                <li key={service.label}>
                   <Link 
-                    href={service.path} 
-                    className="group flex items-center text-white/70 hover:text-emerald-400 transition-all duration-300 font-medium"
+                    href={service.href} 
+                    className="text-gray-400 hover:text-white text-sm transition-colors inline-flex items-center"
                   >
-                    <div className={`w-6 h-6 rounded-lg bg-white/5 group-hover:bg-${service.color}-500/20 flex items-center justify-center mr-3 transition-all duration-300`}>
-                      <ArrowRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity text-emerald-400" />
-                    </div>
-                    <span className="group-hover:translate-x-1 transition-transform duration-300 flex items-center">
-                      {service.name}
-                      {service.isNew && (
-                        <span className="ml-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xs px-2 py-1 rounded-full font-bold shadow-lg animate-pulse">
-                          New
-                        </span>
-                      )}
-                    </span>
+                    {service.label}
                   </Link>
                 </li>
               ))}
+            </ul>
+          </div>
+
+          {/* Contact */}
+          <div>
+            <h3 className="text-sm font-semibold text-white mb-4 uppercase tracking-wider">
+              Support
+            </h3>
+            <ul className="space-y-3">
+              <li>
+                <a 
+                  href="mailto:support@datahustle.com" 
+                  className="text-gray-400 hover:text-white text-sm transition-colors"
+                >
+                  support@datahustle.com
+                </a>
+              </li>
+              <li>
+                <span className="text-gray-400 text-sm">
+                  Available 24/7
+                </span>
+              </li>
             </ul>
           </div>
         </div>
         
-        {/* Bottom Section */}
-        <div className="mt-12 pt-8 border-t border-white/10">
-          <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-            <div className="text-center md:text-left">
-              <p className="text-white/60 font-medium">
-                &copy; {new Date().getFullYear()} DATAHUSTLE. All rights reserved.
-              </p>
-            </div>
+        {/* Bottom bar */}
+        <div className="mt-12 pt-8 border-t border-gray-800">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-gray-400 text-sm">
+              © {currentYear} DATAHUSTLE. All rights reserved.
+            </p>
             
-            <div className="flex items-center space-x-6">
-              <Link 
-                href="/privacy" 
-                className="text-white/60 hover:text-emerald-400 font-medium transition-colors duration-300"
-              >
-                Privacy Policy
-              </Link>
-              <Link 
-                href="/terms" 
-                className="text-white/60 hover:text-emerald-400 font-medium transition-colors duration-300"
-              >
-                Terms of Service
-              </Link>
-              <div className="flex items-center space-x-2 text-emerald-400">
-                <Flame className="w-4 h-4 animate-bounce" />
-                <span className="font-bold text-sm">Keep Hustling!</span>
-              </div>
+            <div className="flex items-center gap-6">
+              {legalLinks.map((link) => (
+                <Link 
+                  key={link.label}
+                  href={link.href} 
+                  className="text-gray-400 hover:text-white text-sm transition-colors"
+                >
+                  {link.label}
+                </Link>
+              ))}
             </div>
           </div>
         </div>
@@ -151,7 +148,7 @@ const Footer = () => {
   );
 };
 
-// Social Media Icon Components
+// Social icons
 const TwitterIcon = ({ className }) => (
   <svg className={className} fill="currentColor" viewBox="0 0 24 24">
     <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z" />

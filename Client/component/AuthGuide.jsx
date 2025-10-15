@@ -1,64 +1,57 @@
 'use client'
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Zap, Sparkles } from 'lucide-react';
+import { Zap } from 'lucide-react';
 
 const AuthGuard = ({ children }) => {
   const router = useRouter();
   const pathname = usePathname();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   
-  // List of paths that should bypass authentication
-  const publicPaths = ['/SignIn', '/SignUp'];
-  const isPublicPath = publicPaths.includes(pathname);
+  const publicRoutes = ['/SignIn', '/SignUp'];
+  const isPublicRoute = publicRoutes.includes(pathname);
 
   useEffect(() => {
-    // If current path is public, don't check auth
-    if (isPublicPath) {
-      setLoading(false);
+    if (isPublicRoute) {
+      setIsLoading(false);
       setIsAuthenticated(true);
       return;
     }
     
-    // Check if user is authenticated
-    const userData = localStorage.getItem('userData');
+    const checkAuth = () => {
+      const userData = localStorage.getItem('userData');
+      
+      if (!userData) {
+        router.push('/SignUp');
+      } else {
+        setIsAuthenticated(true);
+      }
+      
+      setIsLoading(false);
+    };
     
-    if (!userData) {
-      router.push('/SignUp');
-    } else {
-      setIsAuthenticated(true);
-    }
-    
-    setLoading(false);
-  }, [router, isPublicPath, pathname]);
+    checkAuth();
+  }, [router, isPublicRoute, pathname]);
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
-          {/* Epic Loading Animation */}
-          <div className="relative w-32 h-32 mx-auto mb-8">
-            {/* Outer ring */}
-            <div className="absolute inset-0 rounded-full border-4 border-emerald-200/20"></div>
-            {/* Spinning gradient ring */}
-            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-emerald-400 border-r-teal-400 animate-spin"></div>
-            {/* Inner pulsing circle */}
-            <div className="absolute inset-4 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 animate-pulse flex items-center justify-center">
-              <Zap className="w-8 h-8 text-white animate-bounce" strokeWidth={2.5} />
+          <div className="relative w-20 h-20 mx-auto mb-6">
+            <div className="absolute inset-0 rounded-full border-4 border-gray-200 dark:border-gray-700"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-600 animate-spin"></div>
+            <div className="absolute inset-3 rounded-full bg-blue-600 flex items-center justify-center">
+              <Zap className="w-6 h-6 text-white" strokeWidth={2.5} />
             </div>
           </div>
           
-          <div className="space-y-4">
-            <h1 className="text-4xl font-black bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 text-transparent bg-clip-text animate-pulse">
-              DATAHUSTLE
-            </h1>
-            <div className="flex items-center justify-center space-x-2 text-emerald-300">
-              <Sparkles className="w-5 h-5 animate-spin" />
-              <span className="text-lg font-bold">Verifying authentication...</span>
-              <Sparkles className="w-5 h-5 animate-spin" />
-            </div>
-          </div>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
+            DATAHUSTLE
+          </h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Loading...
+          </p>
         </div>
       </div>
     );
