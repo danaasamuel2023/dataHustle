@@ -120,9 +120,15 @@ const sendSMS = async (phoneNumber, message, options = {}) => {
  * @desc    Get all users
  * @access  Admin
  */
-router.get('/users',auth, adminAuth, async (req, res) => {
+router.get('/users', auth, adminAuth, async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '' } = req.query;
+    const { 
+      page = 1, 
+      limit = 10, 
+      search = '',
+      sortBy = 'walletBalance',  // ADD THIS
+      sortOrder = 'desc'          // ADD THIS
+    } = req.query;
     
     const searchQuery = search 
       ? { 
@@ -135,11 +141,15 @@ router.get('/users',auth, adminAuth, async (req, res) => {
         } 
       : {};
     
+    // BUILD SORT OBJECT - ADD THIS
+    const sortObject = {};
+    sortObject[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    
     const users = await User.find(searchQuery)
       .select('-password')
       .limit(parseInt(limit))
       .skip((parseInt(page) - 1) * parseInt(limit))
-      .sort({ createdAt: -1 });
+      .sort(sortObject)  // USE SORT OBJECT HERE
     
     const total = await User.countDocuments(searchQuery);
     
