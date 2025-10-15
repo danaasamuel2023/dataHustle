@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Calendar, ArrowUp, ArrowDown, Database, Users, Activity, RefreshCw, TrendingUp, Award, DollarSign } from 'lucide-react';
+import { Calendar, ArrowUp, ArrowDown, Database, Users, Activity, RefreshCw, TrendingUp, Award, DollarSign, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 // Fetch dashboard data
@@ -54,6 +54,8 @@ const DailyDashboard = () => {
   const [error, setError] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [refreshing, setRefreshing] = useState(false);
+  const [expandedDepositor, setExpandedDepositor] = useState(null);
+  const [expandedCustomer, setExpandedCustomer] = useState(null);
   const router = useRouter();
   
   const formatCurrency = (amount) => {
@@ -62,6 +64,16 @@ const DailyDashboard = () => {
       currency: 'GHS',
       minimumFractionDigits: 2
     }).format(amount);
+  };
+
+  const formatDateTime = (timestamp) => {
+    return new Date(timestamp).toLocaleString('en-GH', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      day: '2-digit',
+      month: 'short'
+    });
   };
   
   const refreshData = async () => {
@@ -112,6 +124,19 @@ const DailyDashboard = () => {
     'failed': '#ef4444',
     'waiting': '#a855f7',
     'delivered': '#14b8a6'
+  };
+
+  const getGatewayBadgeColor = (gateway) => {
+    switch(gateway?.toLowerCase()) {
+      case 'paystack':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400';
+      case 'admin-deposit':
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400';
+      case 'wallet-refund':
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400';
+    }
   };
   
   if (loading) return (
@@ -290,47 +315,65 @@ const DailyDashboard = () => {
             </div>
             <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Top 5 Depositors</h2>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead>
-                <tr>
-                  <th className="px-4 py-3 bg-gray-50 dark:bg-gray-900 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">#</th>
-                  <th className="px-4 py-3 bg-gray-50 dark:bg-gray-900 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Customer</th>
-                  <th className="px-4 py-3 bg-gray-50 dark:bg-gray-900 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Amount</th>
-                  <th className="px-4 py-3 bg-gray-50 dark:bg-gray-900 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Deposits</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {data.topDepositors && data.topDepositors.length > 0 ? (
-                  data.topDepositors.map((depositor, index) => (
-                    <tr key={depositor.userId} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+          <div className="space-y-3">
+            {data.topDepositors && data.topDepositors.length > 0 ? (
+              data.topDepositors.map((depositor, index) => (
+                <div key={depositor.userId} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                  {/* Main Row */}
+                  <div 
+                    className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                    onClick={() => setExpandedDepositor(expandedDepositor === depositor.userId ? null : depositor.userId)}
+                  >
+                    <div className="flex items-center flex-1">
+                      <div className="text-2xl mr-3">
                         {index === 0 && '🥇'}
                         {index === 1 && '🥈'}
                         {index === 2 && '🥉'}
-                        {index > 2 && `${index + 1}`}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
+                        {index > 2 && <span className="text-sm font-bold text-gray-500">{index + 1}</span>}
+                      </div>
+                      <div className="flex-1">
                         <div className="text-sm font-medium text-gray-900 dark:text-white">{depositor.userName}</div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">{depositor.userPhone}</div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-green-600 dark:text-green-400 text-right">
-                        {formatCurrency(depositor.totalDeposited)}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-right">
-                        {depositor.depositCount}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="4" className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                      No deposits today
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                      </div>
+                    </div>
+                    <div className="text-right mr-4">
+                      <div className="text-sm font-bold text-green-600 dark:text-green-400">{formatCurrency(depositor.totalDeposited)}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">{depositor.depositCount} deposits</div>
+                    </div>
+                    {expandedDepositor === depositor.userId ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
+                  </div>
+                  
+                  {/* Expanded Details */}
+                  {expandedDepositor === depositor.userId && depositor.deposits && (
+                    <div className="bg-gray-50 dark:bg-gray-900 p-4 border-t border-gray-200 dark:border-gray-700">
+                      <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase">Deposit Transactions</h4>
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {depositor.deposits.map((deposit, idx) => (
+                          <div key={idx} className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center space-x-2">
+                                <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${getGatewayBadgeColor(deposit.gateway)}`}>
+                                  {deposit.gateway}
+                                </span>
+                                <span className="text-sm font-bold text-gray-900 dark:text-white">{formatCurrency(deposit.amount)}</span>
+                              </div>
+                              <span className="text-xs text-gray-500 dark:text-gray-400">{formatDateTime(deposit.timestamp)}</span>
+                            </div>
+                            <div className="flex items-center text-xs text-gray-600 dark:text-gray-400">
+                              <span className="font-mono bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">{deposit.reference}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-sm text-gray-500 dark:text-gray-400">
+                No deposits today
+              </div>
+            )}
           </div>
         </div>
         
@@ -342,47 +385,75 @@ const DailyDashboard = () => {
             </div>
             <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Top 5 Customers by Orders</h2>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead>
-                <tr>
-                  <th className="px-4 py-3 bg-gray-50 dark:bg-gray-900 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">#</th>
-                  <th className="px-4 py-3 bg-gray-50 dark:bg-gray-900 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Customer</th>
-                  <th className="px-4 py-3 bg-gray-50 dark:bg-gray-900 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Orders</th>
-                  <th className="px-4 py-3 bg-gray-50 dark:bg-gray-900 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Spent</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {data.topCustomersByOrders && data.topCustomersByOrders.length > 0 ? (
-                  data.topCustomersByOrders.map((customer, index) => (
-                    <tr key={customer.userId} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+          <div className="space-y-3">
+            {data.topCustomersByOrders && data.topCustomersByOrders.length > 0 ? (
+              data.topCustomersByOrders.map((customer, index) => (
+                <div key={customer.userId} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                  {/* Main Row */}
+                  <div 
+                    className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                    onClick={() => setExpandedCustomer(expandedCustomer === customer.userId ? null : customer.userId)}
+                  >
+                    <div className="flex items-center flex-1">
+                      <div className="text-2xl mr-3">
                         {index === 0 && '🥇'}
                         {index === 1 && '🥈'}
                         {index === 2 && '🥉'}
-                        {index > 2 && `${index + 1}`}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
+                        {index > 2 && <span className="text-sm font-bold text-gray-500">{index + 1}</span>}
+                      </div>
+                      <div className="flex-1">
                         <div className="text-sm font-medium text-gray-900 dark:text-white">{customer.userName}</div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">{customer.userPhone}</div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-yellow-600 dark:text-yellow-400 text-right">
-                        {customer.orderCount}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white text-right">
-                        {formatCurrency(customer.totalSpent)}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="4" className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                      No orders today
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                      </div>
+                    </div>
+                    <div className="text-right mr-4">
+                      <div className="text-sm font-bold text-yellow-600 dark:text-yellow-400">{customer.orderCount} orders</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">{formatCurrency(customer.totalSpent)}</div>
+                    </div>
+                    {expandedCustomer === customer.userId ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
+                  </div>
+                  
+                  {/* Expanded Details */}
+                  {expandedCustomer === customer.userId && customer.orders && (
+                    <div className="bg-gray-50 dark:bg-gray-900 p-4 border-t border-gray-200 dark:border-gray-700">
+                      <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase">Order History</h4>
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {customer.orders.map((order, idx) => (
+                          <div key={idx} className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center space-x-2">
+                                <span className="text-sm font-bold text-gray-900 dark:text-white">{order.capacity}GB</span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">{order.network}</span>
+                                <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                                  order.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' :
+                                  order.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400' :
+                                  order.status === 'failed' ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400' :
+                                  'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400'
+                                }`}>
+                                  {order.status}
+                                </span>
+                              </div>
+                              <span className="text-sm font-bold text-gray-900 dark:text-white">{formatCurrency(order.price)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
+                              <span className="font-mono bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">{order.reference}</span>
+                              <span>{formatDateTime(order.timestamp)}</span>
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              To: {order.phoneNumber}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-sm text-gray-500 dark:text-gray-400">
+                No orders today
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -1431,17 +1431,41 @@ router.get('/daily-summary', auth, adminAuth, async (req, res) => {
       { $limit: 5 }
     ]);
     
-    // Populate user details for top depositors
+    // Populate user details and deposit details for top depositors
     const topDepositors = await Promise.all(
       topDepositorsAgg.map(async (item) => {
         const user = await User.findById(item._id).select('name email phoneNumber');
+        
+        // Get all deposits for this user on this date
+        const userDeposits = await Transaction.find({
+          userId: item._id,
+          type: 'deposit',
+          status: 'completed',
+          createdAt: {
+            $gte: startDate,
+            $lt: endDate
+          }
+        })
+        .select('reference amount gateway createdAt metadata')
+        .sort({ createdAt: -1 });
+        
+        // Format deposit details
+        const deposits = userDeposits.map(dep => ({
+          reference: dep.reference,
+          amount: dep.amount,
+          gateway: dep.gateway,
+          timestamp: dep.createdAt,
+          metadata: dep.metadata || {}
+        }));
+        
         return {
           userId: item._id,
           userName: user ? user.name : 'Unknown',
           userEmail: user ? user.email : 'N/A',
           userPhone: user ? user.phoneNumber : 'N/A',
           totalDeposited: item.totalDeposited,
-          depositCount: item.depositCount
+          depositCount: item.depositCount,
+          deposits: deposits // Array of all deposits with references
         };
       })
     );
@@ -1465,6 +1489,29 @@ router.get('/daily-summary', auth, adminAuth, async (req, res) => {
     const topCustomersByOrders = await Promise.all(
       topCustomersByOrdersAgg.map(async (item) => {
         const user = await User.findById(item._id).select('name email phoneNumber');
+        
+        // Get recent orders for this customer
+        const recentOrders = await DataPurchase.find({
+          userId: item._id,
+          createdAt: {
+            $gte: startDate,
+            $lt: endDate
+          }
+        })
+        .select('geonetReference phoneNumber capacity network price status createdAt')
+        .sort({ createdAt: -1 });
+        
+        // Format order details
+        const orders = recentOrders.map(order => ({
+          reference: order.geonetReference || order._id,
+          phoneNumber: order.phoneNumber,
+          capacity: order.capacity,
+          network: order.network,
+          price: order.price,
+          status: order.status,
+          timestamp: order.createdAt
+        }));
+        
         return {
           userId: item._id,
           userName: user ? user.name : 'Unknown',
@@ -1472,7 +1519,8 @@ router.get('/daily-summary', auth, adminAuth, async (req, res) => {
           userPhone: user ? user.phoneNumber : 'N/A',
           orderCount: item.orderCount,
           totalSpent: item.totalSpent,
-          totalDataGB: item.totalDataGB
+          totalDataGB: item.totalDataGB,
+          orders: orders // Array of all orders with references
         };
       })
     );
