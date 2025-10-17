@@ -127,7 +127,7 @@ const TransactionsPage = () => {
     
     setVerifyingId(transactionId);
     try {
-      const res = await fetch(`https://datamartbackened.onrender.com/api/v1/verify-pending-transaction/${transactionId}`, {
+      const res = await fetch(`https://datahustle.onrender.com/api/v1/verify-pending-transaction/${transactionId}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
