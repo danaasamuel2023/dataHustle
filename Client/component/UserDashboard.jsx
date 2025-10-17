@@ -407,7 +407,7 @@ const DashboardPage = () => {
                     <span className="text-lg sm:text-xl font-bold text-yellow-500">MTN</span>
                   </div>
                   <div className="flex-1 sm:flex-none text-left sm:text-center">
-                    <p className="text-sm sm:text-base font-bold text-white">MTN Mobile Money</p>
+                    <p className="text-sm sm:text-base font-bold text-white">MTN Mobile Data</p>
                     <p className="text-xs text-yellow-100 mt-0.5 sm:mt-1">
                       {networkInventory.mtn.inStock ? 'Fast & Reliable' : 'Currently Unavailable'}
                     </p>
