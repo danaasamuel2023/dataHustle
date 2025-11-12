@@ -7,7 +7,7 @@ const SMSDashboard = () => {
   const [users, setUsers] = useState([]);
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [message, setMessage] = useState('');
-  const [senderId, setSenderId] = useState('DataMartGH');
+  const [senderId, setSenderId] = useState('DataHustle');
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduleDate, setScheduleDate] = useState('');
   const [sendMethod, setSendMethod] = useState('group'); // Default to group
@@ -41,7 +41,7 @@ const SMSDashboard = () => {
   };
 
   // API base URL - adjust this to match your backend
-  const API_BASE_URL = 'http://localhost:5000/api';
+  const API_BASE_URL = 'https://datahustle.onrender.com/api';
 
   // API call helper with x-auth-token
   const apiCall = async (endpoint, options = {}) => {
