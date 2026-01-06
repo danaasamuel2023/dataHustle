@@ -1,9 +1,8 @@
 'use client'
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Package, Database, DollarSign, TrendingUp, Calendar, X, AlertCircle, PlusCircle, User, BarChart2, Clock, Activity, ArrowRight, Info, Timer } from 'lucide-react';
+import { CreditCard, Package, Database, TrendingUp, X, AlertCircle, PlusCircle, User, BarChart2, Clock, ArrowRight, Info, Timer } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AnimatedCounter, CurrencyCounter } from './Animation';
-import DailySalesChart from '@/app/week/page';
 
 const DashboardPage = () => {
   const router = useRouter();
@@ -40,7 +39,6 @@ const DashboardPage = () => {
   };
 
   const goToNetwork = (network) => {
-    // Check if network is in stock before navigating
     const inventoryKey = network.toLowerCase();
     if (!networkInventory[inventoryKey]?.inStock) {
       alert(`${network.toUpperCase()} bundles are currently out of stock. Please try another network.`);
@@ -87,7 +85,6 @@ const DashboardPage = () => {
       } catch (error) {
         console.error(`❌ Failed to check ${network.key} inventory:`, error);
         
-        // Default to out of stock if API fails
         setNetworkInventory(prev => ({
           ...prev,
           [network.key]: {
@@ -100,7 +97,6 @@ const DashboardPage = () => {
     }
   };
 
-  // Manual refresh handler
   const handleRefreshInventory = () => {
     setNetworkInventory(prev => ({
       mtn: { ...prev.mtn, loading: true },
@@ -126,10 +122,8 @@ const DashboardPage = () => {
       setDisplayNotice(false);
     }
 
-    // Check network inventory on mount
     checkNetworkInventory();
     
-    // Set up auto-refresh every 30 seconds
     const inventoryInterval = setInterval(() => {
       console.log('🔄 Auto-refreshing network inventory...');
       checkNetworkInventory();
@@ -223,7 +217,7 @@ const DashboardPage = () => {
         <div className="text-center">
           <div className="w-16 h-16 mx-auto mb-4 relative">
             <div className="absolute inset-0 rounded-full border-4 border-gray-200 dark:border-gray-700"></div>
-            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-yellow-500 animate-spin"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-indigo-500 animate-spin"></div>
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400">Loading dashboard...</p>
         </div>
@@ -234,13 +228,13 @@ const DashboardPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Service notice */}
+        {/* Service notice - Indigo themed */}
         {displayNotice && (
           <div className="mb-6">
-            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 sm:p-4">
+            <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3 sm:p-4">
               <div className="flex items-start gap-2 sm:gap-3">
-                <div className="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
-                  <Info className="w-3 h-3 sm:w-4 sm:h-4 text-amber-600 dark:text-amber-400" />
+                <div className="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center">
+                  <Info className="w-3 h-3 sm:w-4 sm:h-4 text-indigo-600 dark:text-indigo-400" />
                 </div>
                 
                 <div className="flex-1 min-w-0">
@@ -271,10 +265,10 @@ const DashboardPage = () => {
                     
                     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2 sm:p-3">
                       <div className="flex items-center gap-1 sm:gap-2 mb-1">
-                        <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-blue-600 flex-shrink-0" />
+                        <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-indigo-600 flex-shrink-0" />
                         <span className="text-[10px] sm:text-xs font-semibold text-gray-900 dark:text-white">Business Hours</span>
                       </div>
-                      <p className="text-xs sm:text-sm font-semibold text-blue-600">8:00 AM - 9:00 PM</p>
+                      <p className="text-xs sm:text-sm font-semibold text-indigo-600">8:00 AM - 9:00 PM</p>
                       <p className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 mt-0.5 sm:mt-1">7 days a week</p>
                     </div>
                   </div>
@@ -300,11 +294,10 @@ const DashboardPage = () => {
               <div className="flex gap-2 sm:gap-3">
                 <button 
                   onClick={goToTopup}
-                  className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors text-xs sm:text-sm font-medium flex-1 sm:flex-none justify-center"
+                  className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors text-xs sm:text-sm font-medium flex-1 sm:flex-none justify-center"
                 >
                   <PlusCircle className="w-4 h-4" />
-                  <span className="hidden xs:inline">Top Up</span>
-                  <span className="xs:hidden">Top Up</span>
+                  <span>Top Up</span>
                 </button>
                 
                 <button 
@@ -319,7 +312,7 @@ const DashboardPage = () => {
           </div>
         </div>
 
-        {/* Account Balance */}
+        {/* Account Balance - Indigo themed */}
         <div className="mb-6">
           <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 sm:p-6">
             <div className="flex items-start justify-between mb-4">
@@ -332,14 +325,14 @@ const DashboardPage = () => {
                   }
                 </div>
               </div>
-              <div className="w-10 h-10 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg flex items-center justify-center">
-                <CreditCard className="w-5 h-5 text-yellow-600" />
+              <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg flex items-center justify-center">
+                <CreditCard className="w-5 h-5 text-indigo-600" />
               </div>
             </div>
             
             <button
               onClick={goToTopup}
-              className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors text-sm font-medium w-full sm:w-auto justify-center"
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors text-sm font-medium w-full sm:w-auto justify-center"
             >
               <PlusCircle className="w-4 h-4" />
               Add Funds
@@ -355,7 +348,6 @@ const DashboardPage = () => {
                 Select Network
               </h2>
               
-              {/* Refresh Button */}
               <button
                 onClick={handleRefreshInventory}
                 disabled={networkInventory.mtn.loading || networkInventory.airteltigo.loading || networkInventory.telecel.loading}
@@ -370,7 +362,7 @@ const DashboardPage = () => {
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-              {/* MTN Card */}
+              {/* MTN Card - Keep yellow for brand */}
               <button 
                 onClick={() => goToNetwork('mtn')}
                 disabled={!networkInventory.mtn.inStock}
@@ -380,7 +372,6 @@ const DashboardPage = () => {
                     : 'bg-gradient-to-br from-gray-400 to-gray-500 cursor-not-allowed opacity-60'
                 }`}
               >
-                {/* Stock Status Badge */}
                 <div className="absolute top-2 right-2">
                   <div className={`flex items-center px-2 py-1 rounded-full text-xs font-bold shadow-md ${
                     networkInventory.mtn.loading 
@@ -415,7 +406,7 @@ const DashboardPage = () => {
                 </div>
               </button>
 
-              {/* AirtelTigo Card */}
+              {/* AirtelTigo Card - Keep red for brand */}
               <button 
                 onClick={() => goToNetwork('airteltigo')}
                 disabled={!networkInventory.airteltigo.inStock}
@@ -425,7 +416,6 @@ const DashboardPage = () => {
                     : 'bg-gradient-to-br from-gray-400 to-gray-500 cursor-not-allowed opacity-60'
                 }`}
               >
-                {/* Stock Status Badge */}
                 <div className="absolute top-2 right-2">
                   <div className={`flex items-center px-2 py-1 rounded-full text-xs font-bold shadow-md ${
                     networkInventory.airteltigo.loading 
@@ -460,7 +450,7 @@ const DashboardPage = () => {
                 </div>
               </button>
 
-              {/* Telecel Card */}
+              {/* Telecel Card - Keep purple for brand */}
               <button 
                 onClick={() => goToNetwork('telecel')}
                 disabled={!networkInventory.telecel.inStock}
@@ -470,7 +460,6 @@ const DashboardPage = () => {
                     : 'bg-gradient-to-br from-gray-400 to-gray-500 cursor-not-allowed opacity-60'
                 }`}
               >
-                {/* Stock Status Badge */}
                 <div className="absolute top-2 right-2">
                   <div className={`flex items-center px-2 py-1 rounded-full text-xs font-bold shadow-md ${
                     networkInventory.telecel.loading 
@@ -506,7 +495,6 @@ const DashboardPage = () => {
               </button>
             </div>
             
-            {/* Last Checked Timestamp */}
             {(networkInventory.mtn.lastChecked || networkInventory.airteltigo.lastChecked || networkInventory.telecel.lastChecked) && (
               <div className="text-xs text-gray-500 dark:text-gray-400 mt-3 text-right">
                 Last checked: {(networkInventory.mtn.lastChecked || networkInventory.airteltigo.lastChecked || networkInventory.telecel.lastChecked)?.toLocaleTimeString()}
@@ -515,14 +503,14 @@ const DashboardPage = () => {
           </div>
         </div>
 
-        {/* Orders and Revenue Stats */}
+        {/* Orders and Revenue Stats - Indigo themed */}
         <div className="mb-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Orders */}
             <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 sm:p-6">
               <div className="flex items-start justify-between mb-2">
-                <div className="w-10 h-10 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg flex items-center justify-center">
-                  <Package className="w-5 h-5 text-yellow-600" />
+                <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg flex items-center justify-center">
+                  <Package className="w-5 h-5 text-indigo-600" />
                 </div>
                 <div className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white">
                   {startAnimation ? 
@@ -554,7 +542,7 @@ const DashboardPage = () => {
           </div>
         </div>
 
-        {/* Recent activity */}
+        {/* Recent activity - Indigo themed */}
         <div className="mb-6">
           <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700">
@@ -564,7 +552,7 @@ const DashboardPage = () => {
                 </h2>
                 <button 
                   onClick={viewAllOrders}
-                  className="flex items-center gap-2 text-sm text-yellow-600 hover:text-yellow-700 font-medium"
+                  className="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
                 >
                   View All
                   <ArrowRight className="w-4 h-4" />
@@ -578,8 +566,8 @@ const DashboardPage = () => {
                   {stats.recentTransactions.slice(0, 5).map((tx) => (
                     <div key={tx.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg flex items-center justify-center">
-                          <Database className="w-5 h-5 text-yellow-600" />
+                        <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg flex items-center justify-center">
+                          <Database className="w-5 h-5 text-indigo-600" />
                         </div>
                         <div>
                           <p className="text-sm font-medium text-gray-900 dark:text-white">{tx.customer}</p>
@@ -606,7 +594,7 @@ const DashboardPage = () => {
           </div>
         </div>
 
-        {/* Quick actions */}
+        {/* Quick actions - Indigo hover */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
             { icon: Package, label: 'New Order', path: '/datamart' },
@@ -619,9 +607,9 @@ const DashboardPage = () => {
             <button
               key={idx}
               onClick={action.onClick || (() => router.push(action.path))}
-              className="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              className="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors group"
             >
-              <action.icon className="w-5 h-5 text-gray-600 dark:text-gray-400 mx-auto mb-2" />
+              <action.icon className="w-5 h-5 text-gray-600 dark:text-gray-400 mx-auto mb-2 group-hover:text-indigo-600" />
               <p className="text-xs font-medium text-gray-900 dark:text-white text-center">{action.label}</p>
             </button>
           ))}

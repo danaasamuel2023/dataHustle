@@ -127,7 +127,7 @@ export default function DepositPage() {
         <div className="text-center">
           <div className="w-16 h-16 mx-auto mb-4 relative">
             <div className="absolute inset-0 rounded-full border-4 border-gray-200 dark:border-gray-700"></div>
-            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-yellow-500 animate-spin"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-indigo-500 animate-spin"></div>
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400">Loading...</p>
         </div>
@@ -148,7 +148,8 @@ export default function DepositPage() {
         </div>
 
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden">
-          <div className="bg-yellow-500 p-6">
+          {/* Indigo Header */}
+          <div className="bg-indigo-500 p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
@@ -171,11 +172,12 @@ export default function DepositPage() {
           </div>
 
           <div className="p-6">
-            <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            {/* Info Box - Indigo themed */}
+            <div className="mb-4 p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg">
               <div className="flex items-start gap-2">
-                <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-blue-800 dark:text-blue-200">
-                  Need help? <Link href="/howtodeposite" className="text-blue-600 hover:text-blue-700 underline font-medium">View deposit guide</Link>
+                <Info className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-indigo-800 dark:text-indigo-200">
+                  Need help? <Link href="/howtodeposite" className="text-indigo-600 hover:text-indigo-700 underline font-medium">View deposit guide</Link>
                 </p>
               </div>
             </div>
@@ -205,7 +207,7 @@ export default function DepositPage() {
                   </div>
                   <input
                     type="number"
-                    className="pl-8 pr-3 py-2 block w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                    className="pl-8 pr-3 py-2 block w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     placeholder="Enter amount"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
@@ -219,7 +221,7 @@ export default function DepositPage() {
               {amount && amount > 0 && (
                 <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center">
-                    <TrendingUp className="w-4 h-4 mr-2" />
+                    <TrendingUp className="w-4 h-4 mr-2 text-indigo-600" />
                     Payment Summary
                   </h3>
                   <div className="space-y-2">
@@ -234,17 +236,18 @@ export default function DepositPage() {
                     <div className="border-t border-gray-200 dark:border-gray-600 pt-2 mt-2">
                       <div className="flex justify-between font-semibold text-gray-900 dark:text-white">
                         <span>Total:</span>
-                        <span className="text-yellow-600">GHS {totalAmount}</span>
+                        <span className="text-indigo-600">GHS {totalAmount}</span>
                       </div>
                     </div>
                   </div>
                 </div>
               )}
               
+              {/* Indigo Button */}
               <button
                 onClick={submitDeposit}
                 disabled={isSubmitting}
-                className="w-full flex items-center justify-center py-2.5 px-4 rounded-lg text-white bg-yellow-500 hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 disabled:opacity-50 transition-colors font-medium"
+                className="w-full flex items-center justify-center py-2.5 px-4 rounded-lg text-white bg-indigo-500 hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 transition-colors font-medium"
               >
                 {isSubmitting ? (
                   <>
@@ -257,19 +260,20 @@ export default function DepositPage() {
               </button>
             </div>
 
+            {/* Footer Info */}
             <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
               <div className="space-y-2 text-xs text-gray-600 dark:text-gray-400">
                 <p className="flex items-center">
-                  <Shield className="w-3 h-3 mr-2" />
+                  <Shield className="w-3 h-3 mr-2 text-indigo-600" />
                   3% processing fee applies to all deposits
                 </p>
                 <p className="flex items-center">
-                  <Shield className="w-3 h-3 mr-2" />
+                  <Shield className="w-3 h-3 mr-2 text-indigo-600" />
                   Payments processed securely via Paystack
                 </p>
                 <Link 
                   href="/myorders" 
-                  className="flex items-center text-yellow-600 hover:text-yellow-700 font-medium transition-colors mt-2"
+                  className="flex items-center text-indigo-600 hover:text-indigo-700 font-medium transition-colors mt-2"
                 >
                   <TrendingUp className="w-3 h-3 mr-2" />
                   View transaction history
@@ -280,6 +284,7 @@ export default function DepositPage() {
         </div>
       </div>
       
+      {/* Account Status Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 max-w-sm w-full shadow-xl">
@@ -326,7 +331,7 @@ export default function DepositPage() {
                     </div>
                     <button 
                       onClick={copyToClipboard}
-                      className="flex items-center gap-1 text-yellow-600 hover:text-yellow-700 font-medium p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                      className="flex items-center gap-1 text-indigo-600 hover:text-indigo-700 font-medium p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                     >
                       <Copy size={16} />
                       {copied && <span className="text-xs">Copied!</span>}
@@ -350,7 +355,7 @@ export default function DepositPage() {
               
               <a
                 href="mailto:datamartghana@gmail.com"
-                className="flex-1 py-2 px-3 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded-lg text-center transition-colors text-sm"
+                className="flex-1 py-2 px-3 bg-indigo-500 hover:bg-indigo-600 text-white font-medium rounded-lg text-center transition-colors text-sm"
               >
                 Contact Support
               </a>

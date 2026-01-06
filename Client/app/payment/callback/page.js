@@ -82,7 +82,7 @@ function PaymentCallbackClient() {
             transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
           >
             <div className="w-24 h-24 rounded-full border-4 border-transparent 
-                          border-t-blue-500 border-r-blue-500 dark:border-t-blue-400 dark:border-r-blue-400"></div>
+                          border-t-indigo-500 border-r-indigo-500 dark:border-t-indigo-400 dark:border-r-indigo-400"></div>
           </motion.div>
           <motion.div
             className="absolute inset-2"
@@ -90,19 +90,19 @@ function PaymentCallbackClient() {
             transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
           >
             <div className="w-20 h-20 rounded-full border-4 border-transparent 
-                          border-b-purple-500 border-l-purple-500 dark:border-b-purple-400 dark:border-l-purple-400"></div>
+                          border-b-violet-500 border-l-violet-500 dark:border-b-violet-400 dark:border-l-violet-400"></div>
           </motion.div>
           <motion.div
             className="absolute inset-8"
             animate={{ scale: [0.8, 1.2, 0.8] }}
             transition={{ duration: 1.5, repeat: Infinity }}
           >
-            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 
-                          dark:from-blue-400 dark:to-purple-400"></div>
+            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 
+                          dark:from-indigo-400 dark:to-violet-400"></div>
           </motion.div>
         </div>
       ),
-      bgGradient: 'from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800',
+      bgGradient: 'from-indigo-50 to-violet-50 dark:from-gray-900 dark:to-gray-800',
       cardBg: 'bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg',
       titleColor: 'text-gray-800 dark:text-gray-100'
     },
@@ -171,17 +171,17 @@ function PaymentCallbackClient() {
           transition={{ duration: 2, repeat: Infinity }}
           className="relative"
         >
-          <div className="bg-gradient-to-br from-yellow-400 to-orange-500 
-                        dark:from-yellow-300 dark:to-orange-400 rounded-full p-6">
+          <div className="bg-gradient-to-br from-amber-400 to-orange-500 
+                        dark:from-amber-300 dark:to-orange-400 rounded-full p-6">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
         </motion.div>
       ),
-      bgGradient: 'from-yellow-50 to-orange-50 dark:from-gray-900 dark:to-gray-800',
+      bgGradient: 'from-amber-50 to-orange-50 dark:from-gray-900 dark:to-gray-800',
       cardBg: 'bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg',
-      titleColor: 'text-yellow-700 dark:text-yellow-400'
+      titleColor: 'text-amber-700 dark:text-amber-400'
     }
   };
 
@@ -191,13 +191,13 @@ function PaymentCallbackClient() {
     <div className={`flex items-center justify-center min-h-screen bg-gradient-to-br ${currentConfig.bgGradient} transition-all duration-1000`}>
       <div className="absolute inset-0 overflow-hidden">
         <motion.div
-          className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400 dark:bg-blue-600 rounded-full 
+          className="absolute -top-40 -right-40 w-80 h-80 bg-indigo-400 dark:bg-indigo-600 rounded-full 
                      mix-blend-multiply dark:mix-blend-screen filter blur-xl opacity-30"
           animate={{ x: [0, 100, 0], y: [0, 50, 0] }}
           transition={{ duration: 20, repeat: Infinity }}
         />
         <motion.div
-          className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-400 dark:bg-purple-600 rounded-full 
+          className="absolute -bottom-40 -left-40 w-80 h-80 bg-violet-400 dark:bg-violet-600 rounded-full 
                      mix-blend-multiply dark:mix-blend-screen filter blur-xl opacity-30"
           animate={{ x: [0, -100, 0], y: [0, -50, 0] }}
           transition={{ duration: 15, repeat: Infinity }}
@@ -249,7 +249,7 @@ function PaymentCallbackClient() {
                   </p>
                   <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
                     <motion.div
-                      className="h-full bg-gradient-to-r from-blue-500 to-purple-500"
+                      className="h-full bg-gradient-to-r from-indigo-500 to-violet-500"
                       initial={{ width: "0%" }}
                       animate={{ width: "100%" }}
                       transition={{ duration: 5 }}
@@ -269,7 +269,7 @@ function PaymentCallbackClient() {
                     <motion.div
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
-                      className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 
+                      className="bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 
                                text-white font-medium py-3 px-6 rounded-lg shadow-lg transition-all duration-300"
                     >
                       Return to Dashboard
@@ -277,11 +277,11 @@ function PaymentCallbackClient() {
                   </Link>
                   
                   {status === 'failed' && (
-                    <Link href="/" className="block">
+                    <Link href="/topup" className="block">
                       <motion.div
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        className="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 
+                        className="text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 
                                  font-medium transition-colors duration-300"
                       >
                         Try Again
@@ -318,7 +318,7 @@ function PaymentCallbackClient() {
 
 function PaymentCallbackFallback() {
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-indigo-50 to-violet-50 
                   dark:from-gray-900 dark:to-gray-800">
       <div className="w-full max-w-md p-8 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg rounded-2xl 
                     shadow-2xl border border-gray-200 dark:border-gray-700">
@@ -330,11 +330,11 @@ function PaymentCallbackFallback() {
             <div className="relative w-24 h-24">
               <div className="absolute inset-0 animate-spin">
                 <div className="w-24 h-24 rounded-full border-4 border-transparent 
-                              border-t-blue-500 border-r-blue-500 dark:border-t-blue-400 dark:border-r-blue-400"></div>
+                              border-t-indigo-500 border-r-indigo-500 dark:border-t-indigo-400 dark:border-r-indigo-400"></div>
               </div>
               <div className="absolute inset-8">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 
-                              dark:from-blue-400 dark:to-purple-400 animate-pulse"></div>
+                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 
+                              dark:from-indigo-400 dark:to-violet-400 animate-pulse"></div>
               </div>
             </div>
           </div>
