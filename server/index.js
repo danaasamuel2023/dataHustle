@@ -3,7 +3,7 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const ConnectDB = require('./DataBaseConnection/connection.js');
 // Either import just the router or destructure it from the object
-const authRouter = require('./AuthRoutes/Auth.js').router; 
+const authRouter = require('./AuthRoutes/Auth.js').router;
 const dataOrderRoutes = require('./orderRou/order.js');
 const Deposit = require('./DepositeRoutes/UserDeposite.js');
 const Developer = require('./ResellerApi/resellerApi.js')
@@ -20,6 +20,12 @@ const adminOrder = require('./allOrders/allorders.js')
 const waiting_orders_export = require('./waitingorders/waiting.js')
 const phoneVerification = require('./PhoneVerifyRoutes/Verification.js')
 const sms = require('./smsRoutes/smsRoutes.js')
+
+// Agent Store Routes
+const storeRoutes = require('./storeRoutes/storeRoutes.js');
+const withdrawalRoutes = require('./storeRoutes/withdrawalRoutes.js');
+const adminStoreRoutes = require('./storeRoutes/adminStoreRoutes.js');
+
 dotenv.config();
 
 // Initialize Express app
@@ -51,6 +57,11 @@ app.use('/api/v1', userStats);
 app.use('/api', adminOrder);
 app.use('/api/orders', waiting_orders_export);
 app.use('/api/verifications', phoneVerification);
+
+// Agent Store Routes
+app.use('/api/agent-store', storeRoutes);
+app.use('/api/agent-store', withdrawalRoutes);
+app.use('/api/v1/admin/agent-stores', adminStoreRoutes);
 
 // Default Route
 app.get('/', (req, res) => {

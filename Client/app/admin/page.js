@@ -338,10 +338,54 @@ const AdminUsers = () => {
           <title>Admin - User Management</title>
         </Head>
         
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">User Management</h1>
-          <div className="flex items-center space-x-4">
-            <button 
+        {/* Admin Navigation */}
+        <div className={`mb-6 p-4 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white shadow-sm'}`}>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`text-sm font-medium mr-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Admin:</span>
+            <button
+              onClick={() => router.push('/admin')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium bg-blue-500 text-white`}
+            >
+              Users
+            </button>
+            <button
+              onClick={() => router.push('/admin_stores')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}
+            >
+              Agent Stores
+            </button>
+            <button
+              onClick={() => router.push('/admin-transactions')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}
+            >
+              Transactions
+            </button>
+            <button
+              onClick={() => router.push('/admin-daily')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}
+            >
+              Daily Report
+            </button>
+            <button
+              onClick={() => router.push('/admin-today')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}
+            >
+              Today
+            </button>
+            <button
+              onClick={() => router.push('/admin-report')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}
+            >
+              Reports
+            </button>
+            <button
+              onClick={() => router.push('/admin-action')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}
+            >
+              Actions
+            </button>
+            <div className="flex-1"></div>
+            <button
               onClick={toggleDarkMode}
               className={`p-2 rounded-full ${darkMode ? 'bg-yellow-400 text-gray-900' : 'bg-gray-700 text-white'}`}
               aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -356,13 +400,11 @@ const AdminUsers = () => {
                 </svg>
               )}
             </button>
-            <button 
-              onClick={() => router.push('/admin/dashboard')}
-              className={`px-4 py-2 rounded-md ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`}
-            >
-              Back to Dashboard
-            </button>
           </div>
+        </div>
+
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">User Management</h1>
         </div>
 
         <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>

@@ -22,7 +22,8 @@ import {
   Smartphone,
   Receipt,
   Settings,
-  HelpCircle
+  HelpCircle,
+  Store
 } from 'lucide-react';
 // Simple Success/Error Animation Components (no Lottie needed)
 const SuccessAnimation = () => (
@@ -370,7 +371,11 @@ const MobileNavbar = () => {
       title: null,
       items: [
         { icon: Home, text: 'Dashboard', path: '/', color: 'indigo' },
-        ...(userRole === 'admin' ? [{ icon: LayoutDashboard, text: 'Admin', path: '/admin', color: 'purple' }] : [])
+        { icon: Store, text: 'My Store', path: '/store', color: 'green' },
+        ...(userRole === 'admin' ? [
+          { icon: LayoutDashboard, text: 'Admin Users', path: '/admin', color: 'purple' },
+          { icon: Store, text: 'Agent Stores', path: '/admin_stores', color: 'amber' }
+        ] : [])
       ]
     },
     {

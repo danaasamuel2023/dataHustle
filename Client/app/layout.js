@@ -6,6 +6,7 @@ import AuthGuard from "@/component/AuthGuide";
 import WhatsAppLink from "@/component/groupIcon";
 import Script from "next/script";
 import { ThemeProvider } from "@/app/context/ThemeProvider";
+import StorePromoModal from "@/compoenent/StorePromoModal";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -444,6 +445,7 @@ export default function RootLayout({ children }) {
             {children}
             <WhatsAppLink />
           </main>
+          <StorePromoModal />
           <Footer />
         </ThemeProvider>
         

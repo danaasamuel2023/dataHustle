@@ -15,7 +15,7 @@ const PAYSTACK_BASE_URL = 'https://api.paystack.co';
 const FEE_PERCENTAGE = 0.03; // 3% fee (Paystack charges + your fee)
 
 // mNotify SMS configuration
-const SMS_CONFIG = {
+const SMS_CONFIG = {     
   API_KEY: process.env.MNOTIFY_API_KEY || 'w3rGWhv4e235nDwYvD5gVDyrW',
   SENDER_ID: 'DataHustle',
   BASE_URL: 'https://apps.mnotify.net/smsapi'
@@ -499,6 +499,91 @@ router.post('/paystack/webhook', async (req, res) => {
     if (event.event === 'charge.success') {
       const { reference } = event.data;
       console.log(`Processing webhook payment: ${reference}`);
+
+      // Check if this is a store transaction (STORE-xxx prefix)
+      if (reference && reference.startsWith('STORE-')) {
+        // Forward to store handler
+        try {
+          const { AgentTransaction, AgentStore, AgentProduct, WalletAuditLog } = require('../schema/storeSchema');
+          const storeTransaction = await AgentTransaction.findOne({ transactionId: reference });
+
+          if (storeTransaction && storeTransaction.orderStatus === 'pending') {
+            console.log(`[STORE_WEBHOOK] Processing store order: ${reference}`);
+
+            // Mark as paid
+            storeTransaction.orderStatus = 'paid';
+            storeTransaction.paidAt = new Date();
+            await storeTransaction.save();
+
+            // Fulfill via Geonettech
+            const geonetClient = axios.create({
+              baseURL: 'https://testhub.geonettech.site/api/v1',
+              headers: {
+                'Authorization': `Bearer ${process.env.GEONETTECH_API_KEY || '42|tjhxBxaWWe4mPUpxXN1uIk0KTxypvlSqOIOQWz6K162aa0d6'}`,
+                'Content-Type': 'application/json'
+              }
+            });
+
+            const networkMap = {
+              'MTN': 'YELLO', 'YELLO': 'YELLO',
+              'AIRTELTIGO': 'AT_PREMIUM', 'AT': 'AT_PREMIUM', 'AT_PREMIUM': 'AT_PREMIUM',
+              'TELECEL': 'TELECEL', 'VODAFONE': 'TELECEL'
+            };
+            const geonetNetwork = networkMap[storeTransaction.network?.toUpperCase()] || storeTransaction.network;
+
+            try {
+              const geonetResponse = await geonetClient.post('/data/order', {
+                network: geonetNetwork,
+                recipient: storeTransaction.recipientPhone,
+                capacity: storeTransaction.capacity,
+                phone: storeTransaction.recipientPhone,
+                reference: storeTransaction.transactionId
+              });
+
+              if (geonetResponse.data && (geonetResponse.data.status === 'success' || geonetResponse.data.success)) {
+                storeTransaction.fulfillmentStatus = 'delivered';
+                storeTransaction.geonetReference = geonetResponse.data.reference || geonetResponse.data.data?.reference;
+                storeTransaction.fulfillmentResponse = geonetResponse.data;
+                storeTransaction.orderStatus = 'completed';
+                storeTransaction.completedAt = new Date();
+
+                // Credit store wallet
+                await AgentStore.findByIdAndUpdate(storeTransaction.storeId, {
+                  $inc: {
+                    'wallet.availableBalance': storeTransaction.netProfit,
+                    'wallet.totalEarnings': storeTransaction.netProfit,
+                    'stats.totalOrders': 1,
+                    'stats.totalRevenue': storeTransaction.sellingPrice
+                  }
+                });
+
+                // Update product sold count
+                await AgentProduct.findByIdAndUpdate(storeTransaction.productId, { $inc: { totalSold: 1 } });
+
+                console.log(`[STORE_WEBHOOK] Order completed: ${reference}`);
+              } else {
+                storeTransaction.fulfillmentStatus = 'pending';
+                storeTransaction.orderStatus = 'processing';
+              }
+            } catch (geonetError) {
+              console.error(`[STORE_WEBHOOK] Geonet error: ${geonetError.message}`);
+              storeTransaction.fulfillmentStatus = 'pending';
+              storeTransaction.orderStatus = 'processing';
+              storeTransaction.fulfillmentResponse = { error: geonetError.message };
+            }
+
+            storeTransaction.updatedAt = new Date();
+            await storeTransaction.save();
+          }
+
+          return res.json({ message: 'Store order processed' });
+        } catch (storeError) {
+          console.error('[STORE_WEBHOOK] Error:', storeError.message);
+          return res.json({ message: 'Store webhook error' });
+        }
+      }
+
+      // Regular deposit processing
       const result = await processSuccessfulPayment(reference);
       return res.json({ message: result.message });
     } else {
