@@ -669,7 +669,6 @@ router.get('/user-transactions/:userId', async (req, res) => {
     if (type && type !== 'all') filter.type = type;
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const transactions = await Transaction.find(filter)
-      .populate('relatedPurchaseId', 'phoneNumber network capacity')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
