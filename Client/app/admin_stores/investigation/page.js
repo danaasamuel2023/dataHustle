@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useTheme } from 'next-themes'
 
 const API_BASE = 'https://datahustle.onrender.com/api/v1'
 
-export default function InvestigationPage() {
+function InvestigationContent() {
   const { resolvedTheme } = useTheme()
   const searchParams = useSearchParams()
   const [mounted, setMounted] = useState(false)
@@ -252,5 +252,13 @@ export default function InvestigationPage() {
         </>
       )}
     </div>
+  )
+}
+
+export default function InvestigationPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-8">Loading investigation...</div>}>
+      <InvestigationContent />
+    </Suspense>
   )
 }
