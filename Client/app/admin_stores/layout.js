@@ -24,6 +24,7 @@ export default function AdminStoreLayout({ children }) {
     { name: 'Investigation', href: '/admin_stores/investigation' },
     { name: 'Wallet Fixes', href: '/admin_stores/wallet-fixes' },
     { name: 'Audit Logs', href: '/admin_stores/audit-logs' },
+    { name: 'Stuck Orders', href: '/admin_stores/stuck-orders' },
     { name: 'Withdrawals', href: '/admin_stores/withdrawal' },
     { name: 'Provider Settings', href: '/admin_stores/withdrawal-settings' },
   ]
