@@ -502,79 +502,85 @@ router.post('/paystack/webhook', async (req, res) => {
 
       // Check if this is a store transaction (STORE-xxx prefix)
       if (reference && reference.startsWith('STORE-')) {
-        // Forward to store handler
         try {
-          const { AgentTransaction, AgentStore, AgentProduct, WalletAuditLog } = require('../schema/storeSchema');
-          const storeTransaction = await AgentTransaction.findOne({ transactionId: reference });
+          const { AgentTransaction, AgentStore, AgentProduct } = require('../schema/storeSchema');
 
-          if (storeTransaction && storeTransaction.orderStatus === 'pending') {
-            console.log(`[STORE_WEBHOOK] Processing store order: ${reference}`);
+          // ATOMIC: claim the order (prevents double-processing)
+          const storeTransaction = await AgentTransaction.findOneAndUpdate(
+            { transactionId: reference, orderStatus: 'pending' },
+            { $set: { orderStatus: 'processing' } },
+            { new: true }
+          );
 
-            // Mark as paid
-            storeTransaction.orderStatus = 'paid';
-            storeTransaction.paidAt = new Date();
-            await storeTransaction.save();
+          if (!storeTransaction) {
+            console.log(`[STORE_WEBHOOK] Order ${reference} already claimed or not found`);
+            return res.json({ message: 'Store order already processed' });
+          }
 
-            // Fulfill via Geonettech
-            const geonetClient = axios.create({
-              baseURL: 'https://testhub.geonettech.site/api/v1',
-              headers: {
-                'Authorization': `Bearer ${process.env.GEONETTECH_API_KEY || '42|tjhxBxaWWe4mPUpxXN1uIk0KTxypvlSqOIOQWz6K162aa0d6'}`,
-                'Content-Type': 'application/json'
-              }
+          console.log(`[STORE_WEBHOOK] Processing store order: ${reference}`);
+
+          // Mark as paid
+          storeTransaction.paidAt = new Date();
+          await storeTransaction.save();
+
+          // Fulfill via DataMart API
+          const DATAMART_KEY = process.env.DATAMART_API_KEY || 'fb9b9e81e9640c1861605b4ec333e3bd57bdf70dcce461d766fa877c9c0f7553';
+          const datamartClient = axios.create({
+            baseURL: 'https://api.datamartgh.shop',
+            headers: { 'x-api-key': DATAMART_KEY, 'Content-Type': 'application/json' }
+          });
+
+          const networkMap = {
+            'MTN': 'YELLO', 'YELLO': 'YELLO',
+            'AIRTELTIGO': 'at', 'AT': 'at', 'AT_PREMIUM': 'at',
+            'TELECEL': 'TELECEL', 'VODAFONE': 'TELECEL'
+          };
+          const datamartNetwork = networkMap[storeTransaction.network?.toUpperCase()] || storeTransaction.network;
+
+          try {
+            const datamartResponse = await datamartClient.post('/api/developer/purchase', {
+              phoneNumber: storeTransaction.recipientPhone,
+              network: datamartNetwork,
+              capacity: storeTransaction.capacity.toString(),
+              gateway: 'wallet',
+              ref: storeTransaction.transactionId
             });
 
-            const networkMap = {
-              'MTN': 'YELLO', 'YELLO': 'YELLO',
-              'AIRTELTIGO': 'AT_PREMIUM', 'AT': 'AT_PREMIUM', 'AT_PREMIUM': 'AT_PREMIUM',
-              'TELECEL': 'TELECEL', 'VODAFONE': 'TELECEL'
-            };
-            const geonetNetwork = networkMap[storeTransaction.network?.toUpperCase()] || storeTransaction.network;
+            console.log(`[STORE_WEBHOOK] DataMart response:`, datamartResponse.data);
 
-            try {
-              const geonetResponse = await geonetClient.post('/data/order', {
-                network: geonetNetwork,
-                recipient: storeTransaction.recipientPhone,
-                capacity: storeTransaction.capacity,
-                phone: storeTransaction.recipientPhone,
-                reference: storeTransaction.transactionId
+            if (datamartResponse.data && datamartResponse.data.status === 'success') {
+              storeTransaction.fulfillmentStatus = 'delivered';
+              storeTransaction.datamartReference = datamartResponse.data.reference || datamartResponse.data.data?.reference;
+              storeTransaction.fulfillmentResponse = datamartResponse.data;
+              storeTransaction.orderStatus = 'completed';
+              storeTransaction.completedAt = new Date();
+
+              // Credit store wallet
+              await AgentStore.findByIdAndUpdate(storeTransaction.storeId, {
+                $inc: {
+                  'wallet.availableBalance': storeTransaction.netProfit,
+                  'wallet.totalEarnings': storeTransaction.netProfit,
+                  'stats.totalOrders': 1,
+                  'stats.totalRevenue': storeTransaction.sellingPrice
+                }
               });
 
-              if (geonetResponse.data && (geonetResponse.data.status === 'success' || geonetResponse.data.success)) {
-                storeTransaction.fulfillmentStatus = 'delivered';
-                storeTransaction.geonetReference = geonetResponse.data.reference || geonetResponse.data.data?.reference;
-                storeTransaction.fulfillmentResponse = geonetResponse.data;
-                storeTransaction.orderStatus = 'completed';
-                storeTransaction.completedAt = new Date();
+              // Update product sold count
+              await AgentProduct.findByIdAndUpdate(storeTransaction.productId, { $inc: { totalSold: 1 } });
 
-                // Credit store wallet
-                await AgentStore.findByIdAndUpdate(storeTransaction.storeId, {
-                  $inc: {
-                    'wallet.availableBalance': storeTransaction.netProfit,
-                    'wallet.totalEarnings': storeTransaction.netProfit,
-                    'stats.totalOrders': 1,
-                    'stats.totalRevenue': storeTransaction.sellingPrice
-                  }
-                });
-
-                // Update product sold count
-                await AgentProduct.findByIdAndUpdate(storeTransaction.productId, { $inc: { totalSold: 1 } });
-
-                console.log(`[STORE_WEBHOOK] Order completed: ${reference}`);
-              } else {
-                storeTransaction.fulfillmentStatus = 'pending';
-                storeTransaction.orderStatus = 'processing';
-              }
-            } catch (geonetError) {
-              console.error(`[STORE_WEBHOOK] Geonet error: ${geonetError.message}`);
+              console.log(`[STORE_WEBHOOK] Order completed: ${reference}`);
+            } else {
               storeTransaction.fulfillmentStatus = 'pending';
-              storeTransaction.orderStatus = 'processing';
-              storeTransaction.fulfillmentResponse = { error: geonetError.message };
+              storeTransaction.fulfillmentResponse = datamartResponse.data;
             }
-
-            storeTransaction.updatedAt = new Date();
-            await storeTransaction.save();
+          } catch (datamartError) {
+            console.error(`[STORE_WEBHOOK] DataMart error: ${datamartError.message}`);
+            storeTransaction.fulfillmentStatus = 'pending';
+            storeTransaction.fulfillmentResponse = { error: datamartError.message, response: datamartError.response?.data };
           }
+
+          storeTransaction.updatedAt = new Date();
+          await storeTransaction.save();
 
           return res.json({ message: 'Store order processed' });
         } catch (storeError) {
