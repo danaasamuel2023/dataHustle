@@ -1,10 +1,28 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
+const axios = require('axios');
 const auth = require('../middlewareUser/middleware');
 const adminAuth = require('../adminMiddleware/middleware');
-const { AgentStore, AgentTransaction, StoreWithdrawal, WalletAuditLog, PlatformSettings, PaystackWithdrawalQueue } = require('../schema/storeSchema');
+const { AgentStore, AgentProduct, AgentTransaction, StoreWithdrawal, WalletAuditLog, PlatformSettings, PaystackWithdrawalQueue } = require('../schema/storeSchema');
 const withdrawalUtils = require('./withdrawalRoutes');
+
+// DataMart API for retry fulfillment
+const DATAMART_BASE_URL = 'https://api.datamartgh.shop';
+const DATAMART_API_KEY = process.env.DATAMART_API_KEY || 'fb9b9e81e9640c1861605b4ec333e3bd57bdf70dcce461d766fa877c9c0f7553';
+const datamartClient = axios.create({
+  baseURL: DATAMART_BASE_URL,
+  headers: { 'x-api-key': DATAMART_API_KEY, 'Content-Type': 'application/json' }
+});
+
+const mapNetworkForDatamart = (network) => {
+  const networkMap = {
+    'AIRTELTIGO': 'at', 'AT': 'at', 'AT_PREMIUM': 'at',
+    'YELLO': 'YELLO', 'MTN': 'YELLO',
+    'TELECEL': 'TELECEL', 'VODAFONE': 'TELECEL'
+  };
+  return networkMap[network.toUpperCase().replace(/[\s-_]/g, '')] || network;
+};
 
 // =============================================================================
 // GET ALL AUDIT LOGS (Admin)
@@ -1356,6 +1374,235 @@ router.get('/orders/stuck-processing', auth, adminAuth, async (req, res) => {
     });
   } catch (error) {
     console.error('[STUCK_PROCESSING] Error:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// =============================================================================
+// RETRY STUCK PROCESSING ORDER (Admin)
+// =============================================================================
+router.post('/orders/retry/:transactionId', auth, adminAuth, async (req, res) => {
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+
+    // Atomically claim the order for retry
+    const transaction = await AgentTransaction.findOneAndUpdate(
+      { transactionId: req.params.transactionId, orderStatus: 'processing' },
+      { $set: { fulfillmentStatus: 'retrying' } },
+      { new: true, session }
+    );
+
+    if (!transaction) {
+      await session.abortTransaction();
+      return res.status(404).json({ status: 'error', message: 'Order not found or not in processing status' });
+    }
+
+    // Try DataMart API
+    const datamartPayload = {
+      phoneNumber: transaction.recipientPhone,
+      network: mapNetworkForDatamart(transaction.network),
+      capacity: transaction.capacity.toString(),
+      gateway: 'wallet',
+      ref: transaction.transactionId
+    };
+
+    console.log('[RETRY] Attempting DataMart fulfillment:', datamartPayload);
+
+    let fulfillmentSuccess = false;
+    let datamartResponse = null;
+
+    try {
+      const response = await datamartClient.post('/api/developer/purchase', datamartPayload);
+      datamartResponse = response.data;
+      console.log('[RETRY] DataMart response:', datamartResponse);
+
+      if (datamartResponse && datamartResponse.status === 'success') {
+        fulfillmentSuccess = true;
+      }
+    } catch (datamartError) {
+      datamartResponse = { error: datamartError.message, response: datamartError.response?.data };
+      console.log('[RETRY] DataMart error:', datamartResponse);
+    }
+
+    if (fulfillmentSuccess) {
+      // Mark as completed
+      transaction.orderStatus = 'completed';
+      transaction.fulfillmentStatus = 'delivered';
+      transaction.datamartReference = datamartResponse.reference || datamartResponse.data?.reference;
+      transaction.fulfillmentResponse = datamartResponse;
+      transaction.completedAt = new Date();
+      transaction.updatedAt = new Date();
+      await transaction.save({ session });
+
+      // Credit store wallet
+      await AgentStore.findByIdAndUpdate(
+        transaction.storeId,
+        {
+          $inc: {
+            'wallet.availableBalance': transaction.netProfit,
+            'wallet.totalEarnings': transaction.netProfit,
+            'stats.totalOrders': 1,
+            'stats.totalRevenue': transaction.sellingPrice
+          }
+        },
+        { session }
+      );
+
+      // Update product sold count
+      await AgentProduct.findByIdAndUpdate(
+        transaction.productId,
+        { $inc: { totalSold: 1 } },
+        { session }
+      );
+
+      await session.commitTransaction();
+
+      res.json({
+        status: 'success',
+        message: 'Order fulfilled successfully',
+        data: {
+          transactionId: transaction.transactionId,
+          orderStatus: 'completed',
+          datamartResponse
+        }
+      });
+    } else {
+      // Still failed - revert to processing
+      transaction.fulfillmentStatus = 'pending';
+      transaction.fulfillmentResponse = datamartResponse;
+      transaction.updatedAt = new Date();
+      await transaction.save({ session });
+      await session.commitTransaction();
+
+      res.json({
+        status: 'failed',
+        message: 'DataMart fulfillment failed again',
+        data: {
+          transactionId: transaction.transactionId,
+          orderStatus: 'processing',
+          datamartResponse
+        }
+      });
+    }
+  } catch (error) {
+    if (session.inTransaction()) await session.abortTransaction();
+    console.error('[RETRY] Error:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  } finally {
+    session.endSession();
+  }
+});
+
+// =============================================================================
+// RETRY ALL STUCK PROCESSING ORDERS (Admin)
+// =============================================================================
+router.post('/orders/retry-all-stuck', auth, adminAuth, async (req, res) => {
+  try {
+    const stuckOrders = await AgentTransaction.find({ orderStatus: 'processing' }).sort({ createdAt: 1 });
+
+    if (stuckOrders.length === 0) {
+      return res.json({ status: 'success', message: 'No stuck orders found', results: [] });
+    }
+
+    const results = [];
+
+    for (const order of stuckOrders) {
+      const session = await mongoose.startSession();
+      try {
+        session.startTransaction();
+
+        // Atomically claim
+        const claimed = await AgentTransaction.findOneAndUpdate(
+          { _id: order._id, orderStatus: 'processing' },
+          { $set: { fulfillmentStatus: 'retrying' } },
+          { new: true, session }
+        );
+
+        if (!claimed) {
+          await session.abortTransaction();
+          results.push({ transactionId: order.transactionId, status: 'skipped', reason: 'Already handled' });
+          continue;
+        }
+
+        // Try DataMart
+        const datamartPayload = {
+          phoneNumber: claimed.recipientPhone,
+          network: mapNetworkForDatamart(claimed.network),
+          capacity: claimed.capacity.toString(),
+          gateway: 'wallet',
+          ref: claimed.transactionId
+        };
+
+        let success = false;
+        let datamartResponse = null;
+
+        try {
+          const response = await datamartClient.post('/api/developer/purchase', datamartPayload);
+          datamartResponse = response.data;
+          if (datamartResponse && datamartResponse.status === 'success') {
+            success = true;
+          }
+        } catch (err) {
+          datamartResponse = { error: err.message, response: err.response?.data };
+        }
+
+        if (success) {
+          claimed.orderStatus = 'completed';
+          claimed.fulfillmentStatus = 'delivered';
+          claimed.datamartReference = datamartResponse.reference || datamartResponse.data?.reference;
+          claimed.fulfillmentResponse = datamartResponse;
+          claimed.completedAt = new Date();
+          claimed.updatedAt = new Date();
+          await claimed.save({ session });
+
+          await AgentStore.findByIdAndUpdate(
+            claimed.storeId,
+            {
+              $inc: {
+                'wallet.availableBalance': claimed.netProfit,
+                'wallet.totalEarnings': claimed.netProfit,
+                'stats.totalOrders': 1,
+                'stats.totalRevenue': claimed.sellingPrice
+              }
+            },
+            { session }
+          );
+
+          await AgentProduct.findByIdAndUpdate(
+            claimed.productId,
+            { $inc: { totalSold: 1 } },
+            { session }
+          );
+
+          await session.commitTransaction();
+          results.push({ transactionId: claimed.transactionId, status: 'completed', datamartResponse });
+        } else {
+          claimed.fulfillmentStatus = 'pending';
+          claimed.fulfillmentResponse = datamartResponse;
+          claimed.updatedAt = new Date();
+          await claimed.save({ session });
+          await session.commitTransaction();
+          results.push({ transactionId: claimed.transactionId, status: 'failed', datamartResponse });
+        }
+      } catch (err) {
+        if (session.inTransaction()) await session.abortTransaction();
+        results.push({ transactionId: order.transactionId, status: 'error', error: err.message });
+      } finally {
+        session.endSession();
+      }
+    }
+
+    const completed = results.filter(r => r.status === 'completed').length;
+    const failed = results.filter(r => r.status === 'failed').length;
+
+    res.json({
+      status: 'success',
+      message: `Retried ${stuckOrders.length} orders: ${completed} completed, ${failed} failed`,
+      results
+    });
+  } catch (error) {
+    console.error('[RETRY_ALL] Error:', error);
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
