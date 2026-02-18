@@ -1,14 +1,24 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
-const { User } = require('../schema/schema'); 
+const rateLimit = require('express-rate-limit');
+const { User } = require('../schema/schema');
 const bcrypt = require("bcryptjs");
 
-const JWT_SECRET = process.env.JWT_SECRET || 'DatAmArt';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+// Rate limiter for password reset (prevents OTP brute force + SMS spam)
+const resetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 3, // 3 attempts per 15 min per IP
+  message: { message: 'Too many password reset attempts. Please try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // mNotify SMS configuration
 const SMS_CONFIG = {
-  API_KEY: process.env.MNOTIFY_API_KEY || 'w3rGWhv4e235nDwYvD5gVDyrW',
+  API_KEY: process.env.MNOTIFY_API_KEY,
   SENDER_ID: 'DataMartGH',
   BASE_URL: 'https://apps.mnotify.net/smsapi'
 };
@@ -129,7 +139,7 @@ const sendSMS = async (to, message) => {
 };
 
 // Step 1: Request password reset by phone number (NO authentication required)
-router.post('/request-password-reset', async (req, res) => {
+router.post('/request-password-reset', resetLimiter, async (req, res) => {
   try {
     const { phoneNumber } = req.body;
 
@@ -207,7 +217,7 @@ router.post('/request-password-reset', async (req, res) => {
 });
 
 // Step 2: Verify OTP and reset password (NO authentication required)
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', resetLimiter, async (req, res) => {
   try {
     const { phoneNumber, otp, newPassword } = req.body;
     

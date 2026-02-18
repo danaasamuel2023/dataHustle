@@ -1,5 +1,5 @@
 const axios = require('axios');
-const ARKESEL_API_KEY = 'QkNhS0l2ZUZNeUdweEtmYVRUREg';
+const ARKESEL_API_KEY = process.env.ARKESEL_API_KEY;
 
 // Function to send SMS with retry capability
 const sendSMS = async (phoneNumber, message, options = {}) => {

@@ -1,7 +1,10 @@
 // middleware/auth.js
 
 const jwt = require('jsonwebtoken');
+const dotenv = require('dotenv');
 const { User } = require('../schema/schema');
+
+dotenv.config();
 
 /**
  * Middleware to verify JWT token and attach user to request
@@ -18,7 +21,7 @@ const auth = async (req, res, next) => {
     }
 
     // Verify token
-    const decoded = jwt.verify(token, 'DatAmArt');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // Find user by id
     const user = await User.findById(decoded.userId).select('-password');

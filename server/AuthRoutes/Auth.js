@@ -3,16 +3,34 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
+const rateLimit = require("express-rate-limit");
 const { User, ReferralBonus } = require("../schema/schema");
 
 dotenv.config();
 const router = express.Router();
 
+// Rate limiters for auth routes
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 7, // 7 login attempts per 15 min per IP
+  message: { message: "Too many login attempts. Please try again in 15 minutes." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5, // 5 registrations per hour per IP
+  message: { message: "Too many registration attempts. Please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Generate Unique Referral Code
 const generateReferralCode = () => Math.random().toString(36).substring(2, 8).toUpperCase();
 
 // REGISTER ROUTE
-router.post("/register", async (req, res) => {
+router.post("/register", registerLimiter, async (req, res) => {
   try {
     const { name, email, password, phoneNumber, referredBy } = req.body;
     
@@ -81,7 +99,7 @@ router.post("/register", async (req, res) => {
     // Generate initial token for auto-login after registration
     const token = jwt.sign(
       { userId: newUser._id },
-      'DatAmArt'  ,  
+      process.env.JWT_SECRET  ,  
      { expiresIn: "7d" }
     );
 
@@ -110,7 +128,7 @@ router.post("/register", async (req, res) => {
 });
 
 // LOGIN ROUTE
-router.post("/login", async (req, res) => {
+router.post("/login", loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -128,7 +146,7 @@ router.post("/login", async (req, res) => {
         userId: user._id,
         role: user.role 
       },
-      'DatAmArt',
+      process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
@@ -166,7 +184,7 @@ const authMiddleware = (req, res, next) => {
     const token = authHeader.split(' ')[1];
     
     // Verify token
-    const decoded = jwt.verify(token, 'DatAmArt');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Add user data to request
     req.user = {

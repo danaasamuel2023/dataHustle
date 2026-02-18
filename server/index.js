@@ -1,6 +1,11 @@
 const express = require('express');
 const dotenv = require('dotenv');
+
+// Load env vars BEFORE importing routes (they read process.env at import time)
+dotenv.config();
+
 const cors = require('cors');
+const helmet = require('helmet');
 const ConnectDB = require('./DataBaseConnection/connection.js');
 // Either import just the router or destructure it from the object
 const authRouter = require('./AuthRoutes/Auth.js').router;
@@ -27,14 +32,34 @@ const withdrawalRoutes = require('./storeRoutes/withdrawalRoutes.js');
 const adminStoreRoutes = require('./storeRoutes/adminStoreRoutes.js');
 const settingsRoutes = require('./storeRoutes/settingsRoutes.js');
 
-dotenv.config();
-
 // Initialize Express app
 const app = express();
 
-// Middleware
-app.use(express.json());
-app.use(cors());
+// Security Middleware
+app.use(helmet()); // Sets secure HTTP headers (X-Content-Type-Options, X-Frame-Options, etc.)
+app.use(express.json({ limit: '10mb' })); // Limit request body size
+
+// CORS - restrict to your actual frontend domains
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://data-hustle.vercel.app',
+  'https://datahustle.vercel.app',
+  'https://www.datahustle.com',
+  'https://www.datavendo.shop'
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'x-auth-token', 'Authorization'],
+  credentials: true
+}));
 
 // Connect to Database
 ConnectDB();

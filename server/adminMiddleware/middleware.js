@@ -1,28 +1,33 @@
 // middleware/adminAuth.js
+const { User } = require('../schema/schema');
 
 /**
- * Middleware to verify if the user has admin role privileges
- * This middleware should be used after the auth middleware
- * which attaches the user to the request object
+ * Middleware to verify admin role from DATABASE (not just JWT claims).
+ * This prevents privilege escalation if JWT is compromised -
+ * attacker can't just set role='admin' in a forged token.
+ * Must be used after the auth middleware which attaches req.user.
  */
-const adminAuth = (req, res, next) => {
-    try {
-      // Check if user exists and has required role
-      if (!req.user) {
-        return res.status(401).json({ msg: 'Authentication required' });
-      }
-  
-      // Check if user has admin role
-      if (req.user.role !== 'admin') {
-        return res.status(403).json({ msg: 'Admin access required' });
-      }
-  
-      // User is authenticated and has admin role, proceed
-      next();
-    } catch (err) {
-      console.error('Error in admin authentication middleware:', err.message);
-      res.status(500).json({ msg: 'Server error' });
+const adminAuth = async (req, res, next) => {
+  try {
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ msg: 'Authentication required' });
     }
-  };
-  
-  module.exports = adminAuth;
+
+    // Re-verify role from database - don't trust JWT claim alone
+    const freshUser = await User.findById(req.user._id).select('role');
+    if (!freshUser) {
+      return res.status(401).json({ msg: 'User not found' });
+    }
+
+    if (freshUser.role !== 'admin') {
+      return res.status(403).json({ msg: 'Admin access required' });
+    }
+
+    next();
+  } catch (err) {
+    console.error('Admin auth middleware error:', err.message);
+    res.status(500).json({ msg: 'Server error' });
+  }
+};
+
+module.exports = adminAuth;

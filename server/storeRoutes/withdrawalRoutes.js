@@ -3,7 +3,46 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const axios = require('axios');
+const rateLimit = require('express-rate-limit');
 const auth = require('../middlewareUser/middleware');
+
+// Rate limiter for withdrawal requests (prevents rapid drain attacks)
+const withdrawalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { status: 'error', message: 'Too many withdrawal requests. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Rate limiter for status checks (prevents double-refund spam)
+const statusCheckLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // 10 status checks per minute per IP
+  message: { status: 'error', message: 'Too many status checks. Please wait a moment.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Validate amount is a safe positive number
+const validateAmount = (amount) => {
+  if (typeof amount !== 'number' && typeof amount !== 'string') return false;
+  const num = parseFloat(amount);
+  if (!Number.isFinite(num)) return false;
+  if (num <= 0) return false;
+  if (num > 1000000) return false; // Hard cap at 1M
+  return true;
+};
+
+// Validate Ghana phone number (10 digits starting with 0)
+const validateGhanaPhone = (phone) => {
+  if (!phone || typeof phone !== 'string') return false;
+  const cleaned = phone.replace(/\D/g, '');
+  // Accept 10 digits (local: 0XXXXXXXXX) or 12 digits (international: 233XXXXXXXXX)
+  if (cleaned.length === 10 && cleaned.startsWith('0')) return true;
+  if (cleaned.length === 12 && cleaned.startsWith('233')) return true;
+  return false;
+};
 
 const {
   AgentStore,
@@ -361,11 +400,11 @@ router.get('/stores/:storeId/withdrawal/settings', auth, verifyAgentOwnership, a
 // =============================================================================
 // CREATE WITHDRAWAL REQUEST (Queue + Multi-Provider + Fallback)
 // =============================================================================
-router.post('/stores/:storeId/withdrawal/request', auth, verifyAgentOwnership, async (req, res) => {
+router.post('/stores/:storeId/withdrawal/request', auth, withdrawalLimiter, verifyAgentOwnership, async (req, res) => {
   const session = await mongoose.startSession();
 
   try {
-    const { amount, momoNumber, momoNetwork, momoName, agentNotes } = req.body;
+    let { amount, momoNumber, momoNetwork, momoName, agentNotes } = req.body;
     const store = req.store;
 
     logOperation('CREATE_WITHDRAWAL', { storeId: store._id, amount, network: momoNetwork });
@@ -400,12 +439,18 @@ router.post('/stores/:storeId/withdrawal/request', auth, verifyAgentOwnership, a
       });
     }
 
-    // Validations
-    if (!amount || amount <= 0) return res.status(400).json({ status: 'error', message: 'Invalid amount' });
-    if (amount < wp.minWithdrawal) return res.status(400).json({ status: 'error', message: `Minimum is GH₵${wp.minWithdrawal}` });
-    if (amount > wp.maxWithdrawal) return res.status(400).json({ status: 'error', message: `Maximum is GH₵${wp.maxWithdrawal}` });
-    if (amount > store.wallet.availableBalance) return res.status(400).json({ status: 'error', message: 'Insufficient balance' });
+    // Validations - strict amount checking
+    const parsedAmount = parseFloat(amount);
+    if (!validateAmount(parsedAmount)) return res.status(400).json({ status: 'error', message: 'Invalid amount' });
+    if (parsedAmount < wp.minWithdrawal) return res.status(400).json({ status: 'error', message: `Minimum is GH₵${wp.minWithdrawal}` });
+    if (parsedAmount > wp.maxWithdrawal) return res.status(400).json({ status: 'error', message: `Maximum is GH₵${wp.maxWithdrawal}` });
+    if (parsedAmount > store.wallet.availableBalance) return res.status(400).json({ status: 'error', message: 'Insufficient balance' });
     if (!momoNetwork || !momoNumber) return res.status(400).json({ status: 'error', message: 'MoMo network and number are required' });
+
+    // Phone number validation
+    if (!validateGhanaPhone(momoNumber)) {
+      return res.status(400).json({ status: 'error', message: 'Invalid phone number. Must be 10 digits (e.g. 0241234567)' });
+    }
 
     // Network validation
     const networkValidation = validatePhoneNetwork(momoNumber, momoNetwork);
@@ -429,8 +474,12 @@ router.post('/stores/:storeId/withdrawal/request', auth, verifyAgentOwnership, a
     }
 
     // Calculate fees
-    const fee = Math.round(((amount * wp.feePercent / 100) + wp.fixedFee) * 100) / 100;
-    const netAmount = parseFloat((amount - fee).toFixed(2));
+    const fee = Math.round(((parsedAmount * wp.feePercent / 100) + wp.fixedFee) * 100) / 100;
+    const netAmount = parseFloat((parsedAmount - fee).toFixed(2));
+    if (netAmount <= 0) {
+      return res.status(400).json({ status: 'error', message: 'Amount too small after fees. Please increase the withdrawal amount.' });
+    }
+    amount = parsedAmount; // reassign to sanitized value
     const withdrawalId = generateWithdrawalId();
 
     // Get provider config
@@ -524,8 +573,60 @@ router.post('/stores/:storeId/withdrawal/request', auth, verifyAgentOwnership, a
     }
 
     // =========================================================================
-    // NON-PAYSTACK: Try providers in order (immediate processing)
+    // NON-PAYSTACK: Deduct balance FIRST, then try providers
+    // This prevents race condition where money is sent but balance not deducted
     // =========================================================================
+
+    // Step 1: Atomic balance deduction + withdrawal record creation INSIDE transaction
+    session.startTransaction();
+
+    const balanceUpdate = await AgentStore.findOneAndUpdate(
+      { _id: store._id, 'wallet.availableBalance': { $gte: amount } },
+      { $inc: { 'wallet.availableBalance': -amount, 'wallet.pendingBalance': amount } },
+      { session, new: true }
+    );
+
+    if (!balanceUpdate) {
+      await session.abortTransaction();
+      return res.status(409).json({ status: 'error', message: 'Balance changed during processing. Please try again.' });
+    }
+
+    // Double-check no duplicate withdrawal
+    const dupCheck = await StoreWithdrawal.findOne({
+      storeId: store._id, status: { $in: ['pending', 'processing', 'queued'] }
+    }).session(session);
+
+    if (dupCheck) {
+      await session.abortTransaction();
+      return res.status(409).json({ status: 'error', message: 'Another withdrawal is already processing.' });
+    }
+
+    const withdrawal = new StoreWithdrawal({
+      withdrawalId, storeId: store._id, requestedAmount: amount, fee, netAmount,
+      method: 'momo',
+      paymentDetails: { momoNetwork, momoNumber: formatPhoneInternational(momoNumber), momoName: momoName || '' },
+      status: 'processing', agentNotes,
+      processingDetails: {
+        initiatedAt: new Date(), initiatedBy: req.user._id.toString(),
+        provider: providerPriority[0], gateway: 'mobile_money'
+      }
+    });
+    await withdrawal.save({ session });
+
+    const auditLog = new WalletAuditLog({
+      storeId: store._id, operation: 'withdrawal_hold', amount: -amount,
+      balanceBefore: store.wallet.availableBalance,
+      balanceAfter: balanceUpdate.wallet.availableBalance,
+      source: { type: 'withdrawal', referenceId: withdrawalId, referenceModel: 'StoreWithdrawal' },
+      performedBy: { userId: req.user._id, userType: 'agent' },
+      reason: 'Withdrawal requested - funds held pending provider processing'
+    });
+    await auditLog.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    // Step 2: Try providers OUTSIDE transaction (balance already safely held)
     let transferResult = null;
     let usedProvider = null;
     let providerErrors = {};
@@ -556,70 +657,86 @@ router.post('/stores/:storeId/withdrawal/request', auth, verifyAgentOwnership, a
       }
     }
 
+    // Step 3: If ALL providers failed, refund the held balance
     if (!usedProvider) {
+      const refundSession = await mongoose.startSession();
+      refundSession.startTransaction();
+      try {
+        await AgentStore.findOneAndUpdate(
+          { _id: store._id },
+          { $inc: { 'wallet.pendingBalance': -amount, 'wallet.availableBalance': amount } },
+          { session: refundSession }
+        );
+        withdrawal.status = 'failed';
+        withdrawal.processingDetails.failureReason = 'All providers failed';
+        await withdrawal.save({ session: refundSession });
+
+        const refundAudit = new WalletAuditLog({
+          storeId: store._id, operation: 'refund', amount: amount,
+          source: { type: 'withdrawal_refund', referenceId: withdrawalId, referenceModel: 'StoreWithdrawal' },
+          reason: 'All withdrawal providers failed - funds returned'
+        });
+        await refundAudit.save({ session: refundSession });
+        await refundSession.commitTransaction();
+      } catch (refErr) {
+        await refundSession.abortTransaction();
+        logOperation('REFUND_ERROR', { withdrawalId, error: refErr.message });
+      } finally {
+        refundSession.endSession();
+      }
+
       return res.status(503).json({
         status: 'error',
-        message: 'Withdrawal service temporarily unavailable. Please try again later.',
+        message: 'Withdrawal service temporarily unavailable. Your balance has been restored.',
         providerErrors
       });
     }
 
+    // Step 4: Provider succeeded - update withdrawal details
     const fallbackUsed = providerPriority.indexOf(usedProvider) > 0;
     const isCompleted = transferResult.completed === true;
 
-    // Atomic balance deduction
-    session.startTransaction();
-
-    const balanceUpdate = await AgentStore.findOneAndUpdate(
-      { _id: store._id, 'wallet.availableBalance': { $gte: amount } },
-      {
-        $inc: {
-          'wallet.availableBalance': -amount,
-          'wallet.pendingBalance': isCompleted ? 0 : amount,
-          'wallet.totalWithdrawn': isCompleted ? amount : 0
-        },
-        $set: isCompleted ? { 'wallet.lastWithdrawal': new Date() } : {}
-      },
-      { session, new: true }
-    );
-
-    if (!balanceUpdate) {
-      await session.abortTransaction();
-      return res.status(409).json({ status: 'error', message: 'Balance changed during processing.' });
-    }
-
-    const withdrawal = new StoreWithdrawal({
-      withdrawalId, storeId: store._id, requestedAmount: amount, fee, netAmount,
-      method: 'momo',
-      paymentDetails: { momoNetwork, momoNumber: formatPhoneInternational(momoNumber), momoName: momoName || '' },
-      status: isCompleted ? 'completed' : 'processing',
-      completedAt: isCompleted ? new Date() : undefined,
-      paymentReference: transferResult.transactionId || transferResult.transferCode,
-      agentNotes,
-      processingDetails: {
-        initiatedAt: new Date(), initiatedBy: req.user._id.toString(),
-        provider: usedProvider, gateway: 'mobile_money',
-        paystackTransferCode: usedProvider === 'paystack' ? transferResult.transferCode : undefined,
-        paystackRecipientCode: usedProvider === 'paystack' ? transferResult.recipientCode : undefined,
-        completedAt: isCompleted ? new Date() : undefined,
-        fallbackUsed, primaryProviderError: fallbackUsed ? providerErrors[providerPriority[0]] : undefined
+    const updateSession = await mongoose.startSession();
+    updateSession.startTransaction();
+    try {
+      if (isCompleted) {
+        await AgentStore.findOneAndUpdate(
+          { _id: store._id },
+          {
+            $inc: { 'wallet.pendingBalance': -amount, 'wallet.totalWithdrawn': amount },
+            $set: { 'wallet.lastWithdrawal': new Date() }
+          },
+          { session: updateSession }
+        );
       }
-    });
-    await withdrawal.save({ session });
 
-    const auditLog = new WalletAuditLog({
-      storeId: store._id,
-      operation: isCompleted ? 'withdrawal_complete' : 'withdrawal_hold',
-      amount: -amount,
-      balanceBefore: store.wallet.availableBalance,
-      balanceAfter: balanceUpdate.wallet.availableBalance,
-      source: { type: 'withdrawal', referenceId: withdrawalId, referenceModel: 'StoreWithdrawal' },
-      performedBy: { userId: req.user._id, userType: 'agent' },
-      reason: isCompleted ? `Withdrawal completed via ${usedProvider}` : `Withdrawal requested - funds held pending ${usedProvider} confirmation`
-    });
-    await auditLog.save({ session });
+      withdrawal.status = isCompleted ? 'completed' : 'processing';
+      withdrawal.completedAt = isCompleted ? new Date() : undefined;
+      withdrawal.paymentReference = transferResult.transactionId || transferResult.transferCode;
+      withdrawal.processingDetails.provider = usedProvider;
+      withdrawal.processingDetails.paystackTransferCode = usedProvider === 'paystack' ? transferResult.transferCode : undefined;
+      withdrawal.processingDetails.paystackRecipientCode = usedProvider === 'paystack' ? transferResult.recipientCode : undefined;
+      withdrawal.processingDetails.completedAt = isCompleted ? new Date() : undefined;
+      withdrawal.processingDetails.fallbackUsed = fallbackUsed;
+      withdrawal.processingDetails.primaryProviderError = fallbackUsed ? providerErrors[providerPriority[0]] : undefined;
+      await withdrawal.save({ session: updateSession });
 
-    await session.commitTransaction();
+      if (isCompleted) {
+        const completeAudit = new WalletAuditLog({
+          storeId: store._id, operation: 'withdrawal_complete', amount: -amount,
+          source: { type: 'withdrawal', referenceId: withdrawalId, referenceModel: 'StoreWithdrawal' },
+          reason: `Withdrawal completed via ${usedProvider}`
+        });
+        await completeAudit.save({ session: updateSession });
+      }
+
+      await updateSession.commitTransaction();
+    } catch (err) {
+      await updateSession.abortTransaction();
+      logOperation('UPDATE_ERROR', { withdrawalId, error: err.message });
+    } finally {
+      updateSession.endSession();
+    }
 
     res.json({
       status: 'success',
@@ -646,7 +763,7 @@ router.post('/stores/:storeId/withdrawal/request', auth, verifyAgentOwnership, a
 // =============================================================================
 // CHECK WITHDRAWAL STATUS
 // =============================================================================
-router.post('/stores/:storeId/check-status/:withdrawalId', auth, verifyAgentOwnership, async (req, res) => {
+router.post('/stores/:storeId/check-status/:withdrawalId', auth, statusCheckLimiter, verifyAgentOwnership, async (req, res) => {
   try {
     const withdrawal = await StoreWithdrawal.findOne({
       withdrawalId: req.params.withdrawalId,
@@ -694,10 +811,24 @@ router.post('/stores/:storeId/check-status/:withdrawalId', auth, verifyAgentOwne
     }
 
     if (statusResult.completed) {
-      // Complete the withdrawal
+      // Complete the withdrawal - ATOMIC: only if status is still 'processing'
       const session = await mongoose.startSession();
       session.startTransaction();
       try {
+        // Atomic status check: only update if still processing (prevents double-complete)
+        const updated = await StoreWithdrawal.findOneAndUpdate(
+          { _id: withdrawal._id, status: 'processing' },
+          { $set: { status: 'completed', completedAt: new Date(), 'processingDetails.completedAt': new Date() } },
+          { session, new: true }
+        );
+
+        if (!updated) {
+          // Already completed/failed by another request - no double action
+          await session.abortTransaction();
+          session.endSession();
+          return res.json({ status: 'success', data: { withdrawalId: withdrawal.withdrawalId, status: withdrawal.status } });
+        }
+
         await AgentStore.findOneAndUpdate(
           { _id: withdrawal.storeId, 'wallet.pendingBalance': { $gte: withdrawal.requestedAmount } },
           {
@@ -706,10 +837,6 @@ router.post('/stores/:storeId/check-status/:withdrawalId', auth, verifyAgentOwne
           },
           { session }
         );
-        withdrawal.status = 'completed';
-        withdrawal.completedAt = new Date();
-        withdrawal.processingDetails.completedAt = new Date();
-        await withdrawal.save({ session });
 
         const auditLog = new WalletAuditLog({
           storeId: withdrawal.storeId, operation: 'withdrawal_complete', amount: -withdrawal.requestedAmount,
@@ -728,18 +855,28 @@ router.post('/stores/:storeId/check-status/:withdrawalId', auth, verifyAgentOwne
     }
 
     if (statusResult.failed) {
-      // Refund
+      // Refund - ATOMIC: only if status is still 'processing' (prevents double-refund)
       const session = await mongoose.startSession();
       session.startTransaction();
       try {
+        const updated = await StoreWithdrawal.findOneAndUpdate(
+          { _id: withdrawal._id, status: 'processing' },
+          { $set: { status: 'failed', 'processingDetails.failureReason': 'Transfer failed on provider' } },
+          { session, new: true }
+        );
+
+        if (!updated) {
+          // Already completed/failed - no double refund
+          await session.abortTransaction();
+          session.endSession();
+          return res.json({ status: 'success', data: { withdrawalId: withdrawal.withdrawalId, status: withdrawal.status } });
+        }
+
         await AgentStore.findOneAndUpdate(
           { _id: withdrawal.storeId },
           { $inc: { 'wallet.pendingBalance': -withdrawal.requestedAmount, 'wallet.availableBalance': withdrawal.requestedAmount } },
           { session }
         );
-        withdrawal.status = 'failed';
-        withdrawal.processingDetails.failureReason = 'Transfer failed on provider';
-        await withdrawal.save({ session });
 
         const auditLog = new WalletAuditLog({
           storeId: withdrawal.storeId, operation: 'refund', amount: withdrawal.requestedAmount,
@@ -770,14 +907,16 @@ router.post('/stores/:storeId/check-status/:withdrawalId', auth, verifyAgentOwne
 // =============================================================================
 router.get('/stores/:storeId/withdrawals', auth, verifyAgentOwnership, async (req, res) => {
   try {
-    const { page = 1, limit = 20, status } = req.query;
-    const query = { storeId: req.params.storeId };
-    if (status) query.status = status;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const { status } = req.query;
+    const query = { storeId: req.store._id };
+    if (status && ['pending', 'processing', 'queued', 'completed', 'failed', 'cancelled'].includes(status)) query.status = status;
 
     const withdrawals = await StoreWithdrawal.find(query)
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
-      .limit(parseInt(limit))
+      .limit(limit)
       .select('withdrawalId requestedAmount fee netAmount status method paymentDetails processingDetails createdAt completedAt');
 
     const total = await StoreWithdrawal.countDocuments(query);
@@ -786,7 +925,7 @@ router.get('/stores/:storeId/withdrawals', auth, verifyAgentOwnership, async (re
       status: 'success',
       data: {
         withdrawals,
-        pagination: { page: parseInt(page), limit: parseInt(limit), total, pages: Math.ceil(total / limit) }
+        pagination: { page, limit, total, pages: Math.ceil(total / limit) }
       }
     });
   } catch (error) {

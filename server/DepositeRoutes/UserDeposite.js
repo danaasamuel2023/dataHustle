@@ -10,22 +10,22 @@ const rateLimit = require('express-rate-limit');
 const auth = require('../middlewareUser/middleware');
 
 // Paystack configuration
-const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || 'sk_live_b8f78b58b7860fd9795eb376a8602eba072d6e15'; 
+const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 const PAYSTACK_BASE_URL = 'https://api.paystack.co';
 const FEE_PERCENTAGE = 0.03; // 3% fee (Paystack charges + your fee)
 
 // mNotify SMS configuration
-const SMS_CONFIG = {     
-  API_KEY: process.env.MNOTIFY_API_KEY || 'w3rGWhv4e235nDwYvD5gVDyrW',
+const SMS_CONFIG = {
+  API_KEY: process.env.MNOTIFY_API_KEY,
   SENDER_ID: 'DataHustle',
   BASE_URL: 'https://apps.mnotify.net/smsapi'
 };
 
-// Rate limiting - Increased for testing (reduce to max: 5 in production)
+// Rate limiting for deposits
 const depositLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20000000000000000000000000000, // 20 attempts per 15 min (change to 5 for production)
-  message: 'Too many deposit attempts, please try again later. Please wait 15 minutes and try again.',
+  max: 10, // 10 attempts per 15 min
+  message: { status: 'error', message: 'Too many deposit attempts. Please wait 15 minutes and try again.' },
   standardHeaders: true,
   legacyHeaders: false,
 });

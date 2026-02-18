@@ -127,9 +127,11 @@ router.get('/stores', auth, adminAuth, async (req, res) => {
     const query = {};
     if (status) query.isActive = status === 'active';
     if (search) {
+      // Escape regex special characters to prevent injection
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       query.$or = [
-        { storeName: { $regex: search, $options: 'i' } },
-        { storeSlug: { $regex: search, $options: 'i' } }
+        { storeName: { $regex: escaped, $options: 'i' } },
+        { storeSlug: { $regex: escaped, $options: 'i' } }
       ];
     }
 
@@ -243,9 +245,19 @@ router.post('/wallet/secure-adjust/:storeId', auth, adminAuth, async (req, res) 
     const { storeId } = req.params;
     const { amount, reason, operation } = req.body;
 
-    if (!amount || !reason) {
+    if (!amount || !reason || typeof reason !== 'string' || reason.trim().length < 5) {
       await session.abortTransaction();
-      return res.status(400).json({ status: 'error', message: 'Amount and reason required' });
+      return res.status(400).json({ status: 'error', message: 'Amount and detailed reason (min 5 chars) required' });
+    }
+
+    const adjustAmount = parseFloat(amount);
+    if (!Number.isFinite(adjustAmount) || adjustAmount === 0) {
+      await session.abortTransaction();
+      return res.status(400).json({ status: 'error', message: 'Invalid amount. Must be a non-zero number.' });
+    }
+    if (Math.abs(adjustAmount) > 50000) {
+      await session.abortTransaction();
+      return res.status(400).json({ status: 'error', message: 'Amount exceeds maximum adjustment limit (GH₵50,000). Contact super admin.' });
     }
 
     const store = await AgentStore.findById(storeId).session(session);
@@ -255,7 +267,12 @@ router.post('/wallet/secure-adjust/:storeId', auth, adminAuth, async (req, res) 
     }
 
     const balanceBefore = store.wallet?.availableBalance || 0;
-    const adjustAmount = parseFloat(amount);
+
+    // Prevent negative balance
+    if (balanceBefore + adjustAmount < 0) {
+      await session.abortTransaction();
+      return res.status(400).json({ status: 'error', message: `Cannot deduct GH₵${Math.abs(adjustAmount)} from balance of GH₵${balanceBefore}` });
+    }
 
     // Update balance
     store.wallet.availableBalance = balanceBefore + adjustAmount;
@@ -737,14 +754,18 @@ router.post('/withdrawals/approve/:withdrawalId', auth, adminAuth, async (req, r
 
   try {
     const { withdrawalId } = req.params;
-    const withdrawal = await StoreWithdrawal.findOne({ withdrawalId });
+
+    // ATOMIC: claim the withdrawal for approval (prevents double-approve race condition)
+    const withdrawal = await StoreWithdrawal.findOneAndUpdate(
+      { withdrawalId, status: { $in: ['pending', 'queued'] } },
+      { $set: { status: 'processing', 'processingDetails.approvedBy': req.user._id, 'processingDetails.approvedAt': new Date() } },
+      { new: true }
+    );
 
     if (!withdrawal) {
-      return res.status(404).json({ status: 'error', message: 'Withdrawal not found' });
-    }
-
-    if (!['pending', 'queued'].includes(withdrawal.status)) {
-      return res.status(400).json({ status: 'error', message: `Cannot approve withdrawal with status: ${withdrawal.status}` });
+      const existing = await StoreWithdrawal.findOne({ withdrawalId });
+      if (!existing) return res.status(404).json({ status: 'error', message: 'Withdrawal not found' });
+      return res.status(400).json({ status: 'error', message: `Cannot approve - withdrawal is already ${existing.status}` });
     }
 
     // Get provider config and try to process
@@ -859,14 +880,18 @@ router.post('/withdrawals/reject/:withdrawalId', auth, adminAuth, async (req, re
   try {
     const { withdrawalId } = req.params;
     const { reason } = req.body;
-    const withdrawal = await StoreWithdrawal.findOne({ withdrawalId });
+
+    // ATOMIC: claim the withdrawal for rejection (prevents double-reject race condition)
+    const withdrawal = await StoreWithdrawal.findOneAndUpdate(
+      { withdrawalId, status: { $nin: ['completed', 'cancelled'] } },
+      { $set: { status: 'cancelled', 'processingDetails.failureReason': reason || 'Rejected by admin' } },
+      { new: true }
+    );
 
     if (!withdrawal) {
-      return res.status(404).json({ status: 'error', message: 'Withdrawal not found' });
-    }
-
-    if (['completed', 'cancelled'].includes(withdrawal.status)) {
-      return res.status(400).json({ status: 'error', message: `Cannot reject withdrawal with status: ${withdrawal.status}` });
+      const existing = await StoreWithdrawal.findOne({ withdrawalId });
+      if (!existing) return res.status(404).json({ status: 'error', message: 'Withdrawal not found' });
+      return res.status(400).json({ status: 'error', message: `Cannot reject - withdrawal is already ${existing.status}` });
     }
 
     session.startTransaction();
@@ -882,11 +907,6 @@ router.post('/withdrawals/reject/:withdrawalId', auth, adminAuth, async (req, re
       },
       { session }
     );
-
-    // Update withdrawal
-    withdrawal.status = 'cancelled';
-    withdrawal.processingDetails.failureReason = reason || 'Rejected by admin';
-    await withdrawal.save({ session });
 
     // Audit log
     await new WalletAuditLog({
@@ -926,14 +946,18 @@ router.post('/withdrawals/return-to-balance/:withdrawalId', auth, adminAuth, asy
   try {
     const { withdrawalId } = req.params;
     const { reason } = req.body;
-    const withdrawal = await StoreWithdrawal.findOne({ withdrawalId });
+
+    // ATOMIC: claim the withdrawal for return-to-balance (prevents double-refund race condition)
+    const withdrawal = await StoreWithdrawal.findOneAndUpdate(
+      { withdrawalId, status: { $nin: ['completed', 'cancelled'] } },
+      { $set: { status: 'cancelled', 'processingDetails.failureReason': reason || 'Admin returned to balance' } },
+      { new: true }
+    );
 
     if (!withdrawal) {
-      return res.status(404).json({ status: 'error', message: 'Withdrawal not found' });
-    }
-
-    if (['completed', 'cancelled'].includes(withdrawal.status)) {
-      return res.status(400).json({ status: 'error', message: `Cannot return funds for status: ${withdrawal.status}` });
+      const existing = await StoreWithdrawal.findOne({ withdrawalId });
+      if (!existing) return res.status(404).json({ status: 'error', message: 'Withdrawal not found' });
+      return res.status(400).json({ status: 'error', message: `Cannot return funds - withdrawal is already ${existing.status}` });
     }
 
     session.startTransaction();
@@ -973,32 +997,18 @@ router.post('/withdrawals/return-to-balance/:withdrawalId', auth, adminAuth, asy
         reason: `Admin returned to balance: ${reason || 'No reason provided'}`
       }).save({ session });
     } else {
-      // Edge case: funds not in pending and no refund log (shouldn't normally happen)
-      // Credit back as safety measure
-      await AgentStore.findOneAndUpdate(
-        { _id: withdrawal.storeId },
-        {
-          $inc: { 'wallet.availableBalance': withdrawal.requestedAmount }
-        },
-        { session }
-      );
-
-      await new WalletAuditLog({
-        storeId: withdrawal.storeId,
-        operation: 'refund',
-        amount: withdrawal.requestedAmount,
-        balanceBefore,
-        balanceAfter: balanceBefore + withdrawal.requestedAmount,
-        source: { type: 'withdrawal_refund', referenceId: withdrawal.withdrawalId, referenceModel: 'StoreWithdrawal' },
-        performedBy: { userId: req.user._id, userType: 'admin' },
-        reason: `Admin returned to balance (edge case): ${reason || 'No reason provided'}`
-      }).save({ session });
+      // Edge case: funds not in pending and no refund log
+      // Do NOT blindly credit - log warning for investigation
+      console.error(`[RETURN_TO_BALANCE] WARNING: Withdrawal ${withdrawalId} has no pending balance and no refund log. Manual investigation required.`);
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(409).json({
+        status: 'error',
+        message: 'Cannot determine fund location. Funds are not in pending balance and no refund was logged. Manual investigation required.'
+      });
     }
 
-    withdrawal.status = 'cancelled';
-    withdrawal.processingDetails.failureReason = reason || 'Admin returned to balance';
-    await withdrawal.save({ session });
-
+    // Status already set to 'cancelled' in the atomic claim above
     await PaystackWithdrawalQueue.deleteMany({ withdrawalRef: withdrawal.withdrawalId }).session(session);
 
     await session.commitTransaction();

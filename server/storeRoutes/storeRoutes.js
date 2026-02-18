@@ -18,7 +18,7 @@ const {
 
 // ===== PAYSTACK CONFIGURATION =====
 const PAYSTACK_BASE_URL = 'https://api.paystack.co';
-const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || process.env.PAYSTACK_SECRETE_KEY || 'sk_live_xxx';
+const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 
 const paystackClient = axios.create({
   baseURL: PAYSTACK_BASE_URL,
@@ -30,7 +30,7 @@ const paystackClient = axios.create({
 
 // ===== DATAMART API CONFIGURATION =====
 const DATAMART_BASE_URL = 'https://api.datamartgh.shop';
-const DATAMART_API_KEY = process.env.DATAMART_API_KEY || 'fb9b9e81e9640c1861605b4ec333e3bd57bdf70dcce461d766fa877c9c0f7553';
+const DATAMART_API_KEY = process.env.DATAMART_API_KEY;
 
 const datamartClient = axios.create({
   baseURL: DATAMART_BASE_URL,
@@ -396,8 +396,21 @@ router.get('/stores/:storeSlug/payment/verify', async (req, res) => {
     const paystackResponse = await paystackClient.get(`/transaction/verify/${reference}`);
 
     if (paystackResponse.data.status && paystackResponse.data.data.status === 'success') {
-      // Process the order
-      await processCompletedPayment(transaction);
+      // ATOMIC: Only process if still pending (prevents double-credit from concurrent verify calls)
+      const claimed = await AgentTransaction.findOneAndUpdate(
+        { transactionId: reference, orderStatus: 'pending' },
+        { $set: { orderStatus: 'processing' } },
+        { new: true }
+      );
+
+      if (!claimed) {
+        // Already being processed by another request
+        const current = await AgentTransaction.findOne({ transactionId: reference });
+        return res.json({ status: 'success', message: 'Order already being processed', data: { orderStatus: current?.orderStatus || 'processing' } });
+      }
+
+      // Process the order (now safe - only one request gets here)
+      await processCompletedPayment(claimed);
 
       // Reload transaction to get updated status
       const updatedTransaction = await AgentTransaction.findOne({ transactionId: reference });
@@ -478,9 +491,14 @@ router.post('/webhook/paystack', async (req, res) => {
 
       // Check if this is a store transaction (STORE-xxx prefix)
       if (reference && reference.startsWith('STORE-')) {
-        const transaction = await AgentTransaction.findOne({ transactionId: reference });
+        // ATOMIC: claim the transaction for processing (prevents double-credit from duplicate webhooks)
+        const transaction = await AgentTransaction.findOneAndUpdate(
+          { transactionId: reference, orderStatus: 'pending' },
+          { $set: { orderStatus: 'processing' } },
+          { new: true }
+        );
 
-        if (transaction && transaction.orderStatus === 'pending') {
+        if (transaction) {
           await processCompletedPayment(transaction, event.data);
           logOperation('WEBHOOK_PROCESSED', { transactionId: reference });
         }
@@ -998,8 +1016,14 @@ router.post('/stores/:storeSlug/orders/search', async (req, res) => {
     const { storeSlug } = req.params;
     const { phone } = req.body;
 
-    if (!phone) {
+    if (!phone || typeof phone !== 'string') {
       return res.status(400).json({ status: 'error', message: 'Phone number is required' });
+    }
+
+    // Sanitize phone - only allow digits (prevents regex injection)
+    const sanitizedPhone = phone.replace(/\D/g, '');
+    if (sanitizedPhone.length < 4) {
+      return res.status(400).json({ status: 'error', message: 'Phone number too short' });
     }
 
     const store = await AgentStore.findOne({ storeSlug });
@@ -1010,8 +1034,8 @@ router.post('/stores/:storeSlug/orders/search', async (req, res) => {
     const orders = await AgentTransaction.find({
       storeId: store._id,
       $or: [
-        { customerPhone: { $regex: phone, $options: 'i' } },
-        { recipientPhone: { $regex: phone, $options: 'i' } }
+        { customerPhone: { $regex: sanitizedPhone, $options: 'i' } },
+        { recipientPhone: { $regex: sanitizedPhone, $options: 'i' } }
       ]
     })
       .sort({ createdAt: -1 })
