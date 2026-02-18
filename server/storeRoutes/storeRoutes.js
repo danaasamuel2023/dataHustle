@@ -291,7 +291,7 @@ router.post('/stores/:storeSlug/purchase/initialize', async (req, res) => {
       amount: Math.round(product.sellingPrice * 100), // Convert to pesewas
       currency: 'GHS',
       reference: transactionId,
-      callback_url: `${process.env.FRONTEND_URL || 'https://datavendo.shop'}/shop/${storeSlug}/payment/verify?reference=${transactionId}`,
+      callback_url: `${process.env.FRONTEND_URL || 'https://datavendo.shop'}/${storeSlug}/payment/verify?reference=${transactionId}`,
       metadata: {
         transactionId,
         storeId: store._id.toString(),
