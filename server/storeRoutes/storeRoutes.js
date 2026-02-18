@@ -239,7 +239,7 @@ router.get('/stores/:storeSlugOrId/products', async (req, res) => {
     }
 
     const products = await AgentProduct.find({ storeId: store._id, isActive: true, inStock: true })
-      .select('name description network capacity capacityUnit validity sellingPrice')
+      .select('name description network capacity capacityUnit validity sellingPrice inStock')
       .sort({ network: 1, capacity: 1 });
 
     res.json({ status: 'success', data: { products, storeName: store.storeName } });
