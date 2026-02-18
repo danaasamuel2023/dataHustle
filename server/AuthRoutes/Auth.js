@@ -30,7 +30,7 @@ const registerLimiter = rateLimit({
 const generateReferralCode = () => Math.random().toString(36).substring(2, 8).toUpperCase();
 
 // REGISTER ROUTE
-router.post("/register", registerLimiter, async (req, res) => {
+router.post("/register", async (req, res) => {
   try {
     const { name, email, password, phoneNumber, referredBy } = req.body;
     
@@ -128,7 +128,7 @@ router.post("/register", registerLimiter, async (req, res) => {
 });
 
 // LOGIN ROUTE
-router.post("/login", loginLimiter, async (req, res) => {
+router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 

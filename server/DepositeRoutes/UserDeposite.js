@@ -128,7 +128,7 @@ const checkSuspiciousActivity = async (userId, ip) => {
 };
 
 // ✅ INITIATE DEPOSIT
-router.post('/deposit', depositLimiter, async (req, res) => {
+router.post('/deposit', async (req, res) => {
   try {
     const { userId, amount, email } = req.body;
     if (!userId || !amount || amount <= 0) {

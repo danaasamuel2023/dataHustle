@@ -139,7 +139,7 @@ const sendSMS = async (to, message) => {
 };
 
 // Step 1: Request password reset by phone number (NO authentication required)
-router.post('/request-password-reset', resetLimiter, async (req, res) => {
+router.post('/request-password-reset', async (req, res) => {
   try {
     const { phoneNumber } = req.body;
 
@@ -217,7 +217,7 @@ router.post('/request-password-reset', resetLimiter, async (req, res) => {
 });
 
 // Step 2: Verify OTP and reset password (NO authentication required)
-router.post('/reset-password', resetLimiter, async (req, res) => {
+router.post('/reset-password', async (req, res) => {
   try {
     const { phoneNumber, otp, newPassword } = req.body;
     

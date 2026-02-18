@@ -400,7 +400,7 @@ router.get('/stores/:storeId/withdrawal/settings', auth, verifyAgentOwnership, a
 // =============================================================================
 // CREATE WITHDRAWAL REQUEST (Queue + Multi-Provider + Fallback)
 // =============================================================================
-router.post('/stores/:storeId/withdrawal/request', auth, withdrawalLimiter, verifyAgentOwnership, async (req, res) => {
+router.post('/stores/:storeId/withdrawal/request', auth, verifyAgentOwnership, async (req, res) => {
   const session = await mongoose.startSession();
 
   try {
@@ -763,7 +763,7 @@ router.post('/stores/:storeId/withdrawal/request', auth, withdrawalLimiter, veri
 // =============================================================================
 // CHECK WITHDRAWAL STATUS
 // =============================================================================
-router.post('/stores/:storeId/check-status/:withdrawalId', auth, statusCheckLimiter, verifyAgentOwnership, async (req, res) => {
+router.post('/stores/:storeId/check-status/:withdrawalId', auth, verifyAgentOwnership, async (req, res) => {
   try {
     const withdrawal = await StoreWithdrawal.findOne({
       withdrawalId: req.params.withdrawalId,
