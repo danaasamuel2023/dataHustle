@@ -37,7 +37,7 @@ export default function AdminWithdrawals() {
       headers: { 'x-auth-token': token, 'Content-Type': 'application/json' }
     }
     if (body) config.body = JSON.stringify(body)
-    const res = await fetch(`${API_BASE}/withdrawal${endpoint}`, config)
+    const res = await fetch(`${API_BASE}/admin/agent-stores/withdrawals${endpoint}`, config)
     return res.json()
   }
 
@@ -49,7 +49,7 @@ export default function AdminWithdrawals() {
         limit: pagination.limit,
         ...(filters.status && { status: filters.status })
       })
-      const data = await apiCall(`/admin/all?${params}`)
+      const data = await apiCall(`/all?${params}`)
       if (data.status === 'success') {
         setWithdrawals(data.data.withdrawals || [])
         setPagination(prev => ({ ...prev, total: data.data.pagination?.total || 0 }))
@@ -63,7 +63,7 @@ export default function AdminWithdrawals() {
 
   const fetchStuckWithdrawals = async () => {
     try {
-      const data = await apiCall('/admin/stuck-withdrawals')
+      const data = await apiCall('/stuck')
       if (data.status === 'success') {
         setStuckWithdrawals(data.data.stuckWithdrawals || [])
       }
@@ -74,7 +74,7 @@ export default function AdminWithdrawals() {
 
   const fetchProviderBalance = async () => {
     try {
-      const data = await apiCall('/admin/provider-balance')
+      const data = await apiCall('/provider-balance')
       if (data.status === 'success') {
         setProviderBalance(data.data)
       }
@@ -89,19 +89,19 @@ export default function AdminWithdrawals() {
       let data
       switch (action) {
         case 'approve':
-          data = await apiCall(`/admin/approve/${withdrawalId}`, 'POST')
+          data = await apiCall(`/approve/${withdrawalId}`, 'POST')
           break
         case 'reject':
-          data = await apiCall(`/admin/reject/${withdrawalId}`, 'POST', { reason: extraData.reason || 'Rejected by admin' })
+          data = await apiCall(`/reject/${withdrawalId}`, 'POST', { reason: extraData.reason || 'Rejected by admin' })
           break
         case 'return':
-          data = await apiCall(`/admin/return-to-balance/${withdrawalId}`, 'POST', { reason: extraData.reason || 'Returned by admin' })
+          data = await apiCall(`/return-to-balance/${withdrawalId}`, 'POST', { reason: extraData.reason || 'Returned by admin' })
           break
         case 'retry':
-          data = await apiCall(`/admin/retry/${withdrawalId}`, 'POST', { preferredProvider: extraData.provider || 'moolre' })
+          data = await apiCall(`/retry/${withdrawalId}`, 'POST', { preferredProvider: extraData.provider || 'moolre' })
           break
         case 'force-complete':
-          data = await apiCall(`/admin/force-complete/${withdrawalId}`, 'POST')
+          data = await apiCall(`/force-complete/${withdrawalId}`, 'POST')
           break
       }
       if (data?.status === 'success') {

@@ -1004,3 +1004,10 @@ async function failQueuedWithdrawal(queueItem, reason) {
 module.exports = router;
 module.exports.processPaystackQueue = processPaystackQueue;
 module.exports.PaystackWithdrawalQueue = PaystackWithdrawalQueue;
+module.exports.moolreProcessWithdrawal = moolreProcessWithdrawal;
+module.exports.paystackProcessWithdrawal = paystackProcessWithdrawal;
+module.exports.bulkclixProcessWithdrawal = bulkclixProcessWithdrawal;
+module.exports.getPlatformSettings = getPlatformSettings;
+module.exports.getProviderConfig = getProviderConfig;
+module.exports.updateProviderStats = updateProviderStats;
+module.exports.formatPhoneInternational = formatPhoneInternational;
