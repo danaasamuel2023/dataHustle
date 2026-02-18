@@ -539,7 +539,7 @@ async function processCompletedPayment(transaction, paystackData = null) {
 // Create store
 router.post('/stores/create', auth, async (req, res) => {
   try {
-    const { storeName, storeSlug, description, contactPhone, contactEmail, whatsappNumber } = req.body;
+    const { storeName, storeSlug, description, contactPhone, contactEmail, whatsappNumber, products } = req.body;
     const ownerId = req.user._id;
 
     if (!storeName || !storeSlug) {
@@ -583,9 +583,38 @@ router.post('/stores/create', auth, async (req, res) => {
 
     await store.save();
 
-    logOperation('STORE_CREATED', { storeId: store._id, storeName, ownerId });
+    // Create products if provided
+    let createdProducts = [];
+    if (products && Array.isArray(products) && products.length > 0) {
+      const productDocs = products.map(p => {
+        const basePrice = getBasePrice(p.network, p.capacity);
+        if (!basePrice) return null;
 
-    res.json({ status: 'success', message: 'Store created successfully', data: { store } });
+        return {
+          storeId: store._id,
+          name: p.name || `${p.network} ${p.capacity}${p.capacityUnit || 'GB'}`,
+          productType: 'data',
+          network: p.network,
+          capacity: p.capacity,
+          capacityUnit: p.capacityUnit || 'GB',
+          validity: p.validity || '30 days',
+          basePrice,
+          sellingPrice: Math.max(p.sellingPrice, basePrice),
+          isActive: true,
+          inStock: true,
+          totalSold: 0,
+          createdAt: new Date()
+        };
+      }).filter(Boolean);
+
+      if (productDocs.length > 0) {
+        createdProducts = await AgentProduct.insertMany(productDocs);
+      }
+    }
+
+    logOperation('STORE_CREATED', { storeId: store._id, storeName, ownerId, productsCreated: createdProducts.length });
+
+    res.json({ status: 'success', message: 'Store created successfully', data: { store, products: createdProducts } });
   } catch (error) {
     logOperation('CREATE_STORE_ERROR', { error: error.message });
     res.status(500).json({ status: 'error', message: 'Failed to create store' });
