@@ -97,7 +97,7 @@ export default function StoreDashboard() {
 
   const copyStoreLink = () => {
     if (store?.storeSlug) {
-      navigator.clipboard.writeText(`https://datahustlegh.shop/${store.storeSlug}`);
+      navigator.clipboard.writeText(`https://datavendo.shop/${store.storeSlug}`);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
@@ -194,7 +194,7 @@ export default function StoreDashboard() {
               Your Store Link
             </p>
             <p className="text-sm text-indigo-600 dark:text-indigo-400 truncate mt-1">
-              https://datahustlegh.shop/{store?.storeSlug}
+              https://datavendo.shop/{store?.storeSlug}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -205,7 +205,7 @@ export default function StoreDashboard() {
               {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
             </button>
             <a
-              href={`https://datahustlegh.shop/${store?.storeSlug}`}
+              href={`https://datavendo.shop/${store?.storeSlug}`}
               target="_blank"
               rel="noopener noreferrer"
               className="p-2 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-800 rounded-lg"

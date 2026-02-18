@@ -194,7 +194,7 @@ export default function StoreLayout({ children }) {
           {/* Store link */}
           {store?.storeSlug && (
             <a
-              href={`https://datahustlegh.shop/${store.storeSlug}`}
+              href={`https://datavendo.shop/${store.storeSlug}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm font-medium transition-colors"

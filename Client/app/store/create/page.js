@@ -385,7 +385,7 @@ export default function CreateStore() {
                 </label>
                 <div className="flex items-center">
                   <span className="px-3 py-2.5 bg-gray-100 dark:bg-gray-600 border border-r-0 border-gray-200 dark:border-gray-600 rounded-l-lg text-sm text-gray-500 dark:text-gray-400">
-                    datahustlegh.shop/
+                    datavendo.shop/
                   </span>
                   <input
                     type="text"
@@ -612,7 +612,7 @@ export default function CreateStore() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Store URL</span>
-                  <span className="font-medium text-gray-900 dark:text-white">datahustlegh.shop/{formData.storeSlug}</span>
+                  <span className="font-medium text-gray-900 dark:text-white">datavendo.shop/{formData.storeSlug}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Networks</span>
