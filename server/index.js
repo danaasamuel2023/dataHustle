@@ -59,8 +59,8 @@ app.use('/api/orders', waiting_orders_export);
 app.use('/api/verifications', phoneVerification);
 
 // Agent Store Routes
-app.use('/api/agent-store', storeRoutes);
-app.use('/api/agent-store', withdrawalRoutes);
+app.use('/api/v1/agent-store', storeRoutes);
+app.use('/api/v1/agent-store', withdrawalRoutes);
 app.use('/api/v1/admin/agent-stores', adminStoreRoutes);
 
 // Default Route
