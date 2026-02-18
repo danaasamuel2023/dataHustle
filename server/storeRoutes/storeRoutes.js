@@ -304,7 +304,7 @@ router.post('/stores/:storeSlug/purchase/initialize', async (req, res) => {
       amount: Math.round(product.sellingPrice * 100), // Convert to pesewas
       currency: 'GHS',
       reference: transactionId,
-      callback_url: `${process.env.FRONTEND_URL || 'https://datavendo.shop'}/${storeSlug}/payment/verify?reference=${transactionId}`,
+      callback_url: `${process.env.FRONTEND_URL || 'https://www.datavendo.shop'}/store/payment/verify?reference=${transactionId}&store=${storeSlug}`,
       metadata: {
         transactionId,
         storeId: store._id.toString(),
@@ -404,9 +404,26 @@ router.get('/stores/:storeSlug/payment/verify', async (req, res) => {
       );
 
       if (!claimed) {
-        // Already being processed by another request
+        // Already being processed by another request - return full data
         const current = await AgentTransaction.findOne({ transactionId: reference });
-        return res.json({ status: 'success', message: 'Order already being processed', data: { orderStatus: current?.orderStatus || 'processing' } });
+        return res.json({
+          status: 'success',
+          message: 'Order already being processed',
+          data: {
+            transactionId: current?.transactionId,
+            orderStatus: current?.orderStatus || 'processing',
+            fulfillmentStatus: current?.fulfillmentStatus,
+            network: current?.network,
+            capacity: current?.capacity,
+            capacityUnit: current?.capacityUnit,
+            recipientPhone: current?.recipientPhone,
+            customerPhone: current?.customerPhone,
+            sellingPrice: current?.sellingPrice,
+            amount: current?.customerPaid,
+            productName: current?.productName,
+            createdAt: current?.createdAt
+          }
+        });
       }
 
       // Process the order (now safe - only one request gets here)
