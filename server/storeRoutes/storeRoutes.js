@@ -536,6 +536,41 @@ async function processCompletedPayment(transaction, paystackData = null) {
 
 // ===== AUTHENTICATED ROUTES =====
 
+// Get products by store ID (authenticated - for store owner dashboard)
+router.get('/stores/:storeId/products', auth, async (req, res) => {
+  try {
+    const { storeId } = req.params;
+
+    // Check if storeId looks like a MongoDB ObjectId (24 hex chars)
+    if (/^[0-9a-fA-F]{24}$/.test(storeId)) {
+      const store = await AgentStore.findById(storeId);
+      if (!store) {
+        return res.status(404).json({ status: 'error', message: 'Store not found' });
+      }
+
+      const products = await AgentProduct.find({ storeId: store._id })
+        .sort({ network: 1, capacity: 1 });
+
+      return res.json({ status: 'success', data: { products } });
+    }
+
+    // Fall through to slug-based lookup (handled by the public route)
+    const store = await AgentStore.findOne({ storeSlug: storeId, isActive: true });
+    if (!store) {
+      return res.status(404).json({ status: 'error', message: 'Store not found' });
+    }
+
+    const products = await AgentProduct.find({ storeId: store._id, isActive: true, inStock: true })
+      .select('name description network capacity capacityUnit validity sellingPrice')
+      .sort({ network: 1, capacity: 1 });
+
+    res.json({ status: 'success', data: { products, storeName: store.storeName } });
+  } catch (error) {
+    logOperation('GET_PRODUCTS_BY_ID_ERROR', { error: error.message });
+    res.status(500).json({ status: 'error', message: 'Failed to fetch products' });
+  }
+});
+
 // Create store
 router.post('/stores/create', auth, async (req, res) => {
   try {
