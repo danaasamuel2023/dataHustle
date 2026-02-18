@@ -84,7 +84,7 @@ export default function ProductsPage() {
     try {
       // Fetch store first
       const storeRes = await fetch(`${API_BASE}/agent-store/stores/my-store`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'x-auth-token': token }
       });
       const storeData = await storeRes.json();
 
@@ -98,7 +98,7 @@ export default function ProductsPage() {
 
       // Fetch products
       const productsRes = await fetch(`${API_BASE}/agent-store/stores/${storeId}/products`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'x-auth-token': token }
       });
       const productsData = await productsRes.json();
 
@@ -210,7 +210,7 @@ export default function ProductsPage() {
         method: editingProduct ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'x-auth-token': token
         },
         body: JSON.stringify(payload)
       });
@@ -239,7 +239,7 @@ export default function ProductsPage() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'x-auth-token': token
         },
         body: JSON.stringify({ isActive: !product.isActive })
       });
@@ -261,7 +261,7 @@ export default function ProductsPage() {
     try {
       const res = await fetch(`${API_BASE}/agent-store/stores/${store._id}/products/${productId}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'x-auth-token': token }
       });
 
       if (res.ok) {

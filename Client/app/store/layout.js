@@ -50,7 +50,7 @@ export default function StoreLayout({ children }) {
 
       try {
         const res = await fetch(`${API_BASE}/agent-store/stores/my-store`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'x-auth-token': token }
         });
         const data = await res.json();
 

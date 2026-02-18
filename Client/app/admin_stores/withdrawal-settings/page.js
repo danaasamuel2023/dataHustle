@@ -24,7 +24,7 @@ export default function WithdrawalSettingsPage() {
     try {
       const token = localStorage.getItem('authToken')
       const res = await fetch(`${API_BASE}/settings`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'x-auth-token': token }
       })
       const data = await res.json()
       if (data.status === 'success') {
@@ -44,7 +44,7 @@ export default function WithdrawalSettingsPage() {
       const res = await fetch(`${API_BASE}/settings`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'x-auth-token': token,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(settings)

@@ -42,7 +42,7 @@ export default function AgentsBalancesPage() {
       })
 
       const res = await fetch(`${API_BASE}/admin/agent-stores/agents/balances?${params}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'x-auth-token': token }
       })
       const data = await res.json()
 
@@ -63,7 +63,7 @@ export default function AgentsBalancesPage() {
       setDetailsLoading(true)
       const token = localStorage.getItem('authToken')
       const res = await fetch(`${API_BASE}/admin/agent-stores/agents/${storeId}/full-details`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'x-auth-token': token }
       })
       const data = await res.json()
       if (data.status === 'success') {

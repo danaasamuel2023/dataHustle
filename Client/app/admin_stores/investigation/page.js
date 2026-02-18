@@ -30,7 +30,7 @@ function InvestigationContent() {
   const apiCall = async (endpoint) => {
     const token = localStorage.getItem('authToken')
     const res = await fetch(`${API_BASE}/admin/agent-stores${endpoint}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
+      headers: { 'x-auth-token': token }
     })
     return res.json()
   }

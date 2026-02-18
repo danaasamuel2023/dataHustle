@@ -27,7 +27,7 @@ export default function AdminStoresDashboard() {
   const fetchDashboardData = async () => {
     try {
       const token = localStorage.getItem('authToken')
-      const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+      const headers = { 'x-auth-token': token, 'Content-Type': 'application/json' }
 
       const [summaryRes, topRes, activityRes] = await Promise.all([
         fetch(`${API_BASE}/admin/agent-stores/investigation/summary`, { headers }),

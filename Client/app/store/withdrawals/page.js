@@ -60,7 +60,7 @@ export default function WithdrawalsPage() {
     try {
       // Fetch store
       const storeRes = await fetch(`${API_BASE}/agent-store/stores/my-store`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'x-auth-token': token }
       });
       const storeData = await storeRes.json();
 
@@ -74,7 +74,7 @@ export default function WithdrawalsPage() {
 
       // Fetch withdrawals
       const withdrawalsRes = await fetch(`${API_BASE}/agent-store/stores/${storeId}/withdrawals`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'x-auth-token': token }
       });
       const withdrawalsData = await withdrawalsRes.json();
 
@@ -133,7 +133,7 @@ export default function WithdrawalsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'x-auth-token': token
         },
         body: JSON.stringify({
           amount,

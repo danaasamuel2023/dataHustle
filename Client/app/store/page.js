@@ -47,7 +47,7 @@ export default function StoreDashboard() {
     try {
       // Fetch store first
       const storeRes = await fetch(`${API_BASE}/agent-store/stores/my-store`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'x-auth-token': token }
       });
       const storeData = await storeRes.json();
 
@@ -61,7 +61,7 @@ export default function StoreDashboard() {
 
       // Fetch dashboard data
       const dashboardRes = await fetch(`${API_BASE}/agent-store/stores/${storeId}/dashboard`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'x-auth-token': token }
       });
       const dashboardData = await dashboardRes.json();
 
@@ -71,7 +71,7 @@ export default function StoreDashboard() {
 
       // Fetch recent orders
       const ordersRes = await fetch(`${API_BASE}/agent-store/stores/${storeId}/orders?limit=5`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'x-auth-token': token }
       });
       const ordersData = await ordersRes.json();
 

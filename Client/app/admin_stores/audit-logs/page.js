@@ -40,7 +40,7 @@ export default function AuditLogsPage() {
       })
 
       const res = await fetch(`${API_BASE}/admin/agent-stores/audit/all?${params}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'x-auth-token': token }
       })
       const data = await res.json()
 

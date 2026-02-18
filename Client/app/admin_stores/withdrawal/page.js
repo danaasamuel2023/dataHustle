@@ -34,7 +34,7 @@ export default function AdminWithdrawals() {
     const token = localStorage.getItem('authToken')
     const config = {
       method,
-      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+      headers: { 'x-auth-token': token, 'Content-Type': 'application/json' }
     }
     if (body) config.body = JSON.stringify(body)
     const res = await fetch(`${API_BASE}/withdrawal${endpoint}`, config)

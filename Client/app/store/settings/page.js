@@ -64,7 +64,7 @@ export default function SettingsPage() {
 
     try {
       const res = await fetch(`${API_BASE}/agent-store/stores/my-store`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'x-auth-token': token }
       });
       const data = await res.json();
 
@@ -112,7 +112,7 @@ export default function SettingsPage() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'x-auth-token': token
         },
         body: JSON.stringify(formData)
       });
