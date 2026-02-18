@@ -1607,4 +1607,104 @@ router.post('/orders/retry-all-stuck', auth, adminAuth, async (req, res) => {
   }
 });
 
+// =============================================================================
+// GET ALL AGENTS WITH BALANCES (Admin)
+// =============================================================================
+router.get('/agents/balances', auth, adminAuth, async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 50,
+      sortBy = 'balance',
+      sortOrder = 'desc',
+      status,
+      minBalance
+    } = req.query;
+
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = Math.min(100, parseInt(limit));
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build query
+    const query = {};
+    if (status === 'active') query.isActive = true;
+    if (status === 'inactive') query.isActive = false;
+    if (minBalance) query['wallet.availableBalance'] = { $gte: parseFloat(minBalance) };
+
+    // Build sort
+    const sortMap = {
+      'balance': 'wallet.availableBalance',
+      'earnings': 'wallet.totalEarnings',
+      'withdrawn': 'wallet.totalWithdrawn',
+      'pending': 'wallet.pendingBalance',
+      'created': 'createdAt',
+      'name': 'storeName'
+    };
+    const sortField = sortMap[sortBy] || 'wallet.availableBalance';
+    const sort = { [sortField]: sortOrder === 'asc' ? 1 : -1 };
+
+    const [agents, total] = await Promise.all([
+      AgentStore.find(query)
+        .populate('owner', 'name email phoneNumber')
+        .sort(sort)
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      AgentStore.countDocuments(query)
+    ]);
+
+    // Calculate totals
+    const allStores = await AgentStore.aggregate([
+      { $match: query },
+      {
+        $group: {
+          _id: null,
+          totalBalance: { $sum: '$wallet.availableBalance' },
+          totalPending: { $sum: '$wallet.pendingBalance' },
+          totalEarnings: { $sum: '$wallet.totalEarnings' },
+          totalWithdrawn: { $sum: '$wallet.totalWithdrawn' }
+        }
+      }
+    ]);
+
+    const totals = allStores[0] || { totalBalance: 0, totalPending: 0, totalEarnings: 0, totalWithdrawn: 0 };
+
+    res.json({
+      status: 'success',
+      data: {
+        agents: agents.map(a => ({
+          storeId: a._id,
+          storeName: a.storeName,
+          storeSlug: a.storeSlug,
+          isActive: a.isActive,
+          owner: a.owner ? {
+            _id: a.owner._id,
+            name: a.owner.name,
+            email: a.owner.email,
+            phone: a.owner.phoneNumber
+          } : null,
+          wallet: a.wallet,
+          stats: a.stats,
+          createdAt: a.createdAt
+        })),
+        totals: {
+          totalBalance: totals.totalBalance,
+          totalPending: totals.totalPending,
+          totalEarnings: totals.totalEarnings,
+          totalWithdrawn: totals.totalWithdrawn
+        },
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          pages: Math.ceil(total / limitNum)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('[AGENTS_BALANCES] Error:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
 module.exports = router;
