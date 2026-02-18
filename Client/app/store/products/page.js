@@ -11,7 +11,6 @@ import {
   ToggleRight,
   Loader2,
   Search,
-  Filter,
   AlertCircle,
   X,
   Check
@@ -20,7 +19,6 @@ import {
 const API_BASE = 'https://datahustle.onrender.com/api/v1';
 
 const NETWORKS = ['MTN', 'TELECEL', 'AT'];
-const CAPACITY_UNITS = ['MB', 'GB'];
 
 // Must match backend OFFICIAL_PRICING exactly
 const OFFICIAL_PRICING = {
@@ -44,6 +42,43 @@ const OFFICIAL_PRICING = {
 const getBasePrice = (network, capacity) => {
   return OFFICIAL_PRICING[network]?.[capacity] || null;
 };
+
+// Network Icons
+const MTNIcon = ({ size = 40 }) => (
+  <svg width={size} height={size} viewBox="0 0 80 80" fill="none">
+    <rect width="80" height="80" rx="16" fill="#FFCC00"/>
+    <ellipse cx="40" cy="40" rx="30" ry="20" stroke="#000" strokeWidth="3" fill="none"/>
+    <text x="40" y="46" textAnchor="middle" fontFamily="Arial Black" fontSize="14" fontWeight="900" fill="#000">MTN</text>
+  </svg>
+);
+
+const TelecelIcon = ({ size = 40 }) => (
+  <svg width={size} height={size} viewBox="0 0 80 80" fill="none">
+    <rect width="80" height="80" rx="16" fill="#E30613"/>
+    <circle cx="40" cy="40" r="28" fill="#FFF" fillOpacity="0.15"/>
+    <text x="40" y="50" textAnchor="middle" fontFamily="Arial" fontSize="32" fontWeight="700" fill="#FFF">t</text>
+  </svg>
+);
+
+const ATIcon = ({ size = 40 }) => (
+  <svg width={size} height={size} viewBox="0 0 80 80" fill="none">
+    <rect width="80" height="80" rx="16" fill="#0066B3"/>
+    <circle cx="30" cy="32" r="5" fill="#FFF"/>
+    <circle cx="50" cy="32" r="5" fill="#FFF"/>
+    <path d="M24 48 Q40 64 56 48" stroke="#FFF" strokeWidth="5" fill="none" strokeLinecap="round"/>
+  </svg>
+);
+
+const getNetworkIcon = (network, size = 40) => {
+  switch (network) {
+    case 'MTN': return <MTNIcon size={size} />;
+    case 'TELECEL': return <TelecelIcon size={size} />;
+    case 'AT': return <ATIcon size={size} />;
+    default: return <MTNIcon size={size} />;
+  }
+};
+
+const NETWORK_LABELS = { MTN: 'MTN', TELECEL: 'Telecel', AT: 'AirtelTigo' };
 
 export default function ProductsPage() {
   const router = useRouter();
@@ -82,7 +117,6 @@ export default function ProductsPage() {
     }
 
     try {
-      // Fetch store first
       const storeRes = await fetch(`${API_BASE}/agent-store/stores/my-store`, {
         headers: { 'x-auth-token': token }
       });
@@ -96,7 +130,6 @@ export default function ProductsPage() {
       setStore(storeData.data.store);
       const storeId = storeData.data.store._id;
 
-      // Fetch products
       const productsRes = await fetch(`${API_BASE}/agent-store/stores/${storeId}/products`, {
         headers: { 'x-auth-token': token }
       });
@@ -117,7 +150,6 @@ export default function ProductsPage() {
     fetchProducts();
   }, [router]);
 
-  // Filter products
   useEffect(() => {
     let filtered = products;
 
@@ -282,6 +314,12 @@ export default function ProductsPage() {
     );
   }
 
+  // Group products by network for summary
+  const networkCounts = products.reduce((acc, p) => {
+    acc[p.network] = (acc[p.network] || 0) + 1;
+    return acc;
+  }, {});
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -291,7 +329,7 @@ export default function ProductsPage() {
             Products
           </h1>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Manage your data bundle products
+            {products.length} bundle{products.length !== 1 ? 's' : ''} across {Object.keys(networkCounts).length} network{Object.keys(networkCounts).length !== 1 ? 's' : ''}
           </p>
         </div>
         <button
@@ -303,145 +341,139 @@ export default function ProductsPage() {
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search products..."
-            className="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-        <select
-          value={filterNetwork}
-          onChange={(e) => setFilterNetwork(e.target.value)}
-          className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white"
+      {/* Network Filter Tabs */}
+      <div className="flex items-center gap-3 overflow-x-auto pb-1">
+        <button
+          onClick={() => setFilterNetwork('')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors whitespace-nowrap ${
+            filterNetwork === ''
+              ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400'
+              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+          }`}
         >
-          <option value="">All Networks</option>
-          {NETWORKS.map(network => (
-            <option key={network} value={network}>{network}</option>
-          ))}
-        </select>
+          All ({products.length})
+        </button>
+        {NETWORKS.map(net => {
+          const count = networkCounts[net] || 0;
+          if (count === 0 && filterNetwork !== net) return null;
+          return (
+            <button
+              key={net}
+              onClick={() => setFilterNetwork(filterNetwork === net ? '' : net)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors whitespace-nowrap ${
+                filterNetwork === net
+                  ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400'
+                  : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+              }`}
+            >
+              {getNetworkIcon(net, 20)}
+              {NETWORK_LABELS[net]} ({count})
+            </button>
+          );
+        })}
       </div>
 
-      {/* Products List */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-        {filteredProducts.length === 0 ? (
-          <div className="p-8 text-center">
-            <Package className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-            <p className="text-gray-600 dark:text-gray-400">No products found</p>
-            <button
-              onClick={openAddModal}
-              className="mt-4 text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
-            >
-              Add your first product
-            </button>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200 dark:border-gray-700">
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Product
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Network
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Cost
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Price
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Profit
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Status
-                  </th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredProducts.map((product) => (
-                  <tr key={product._id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                    <td className="px-4 py-3">
-                      <div>
-                        <p className="font-medium text-gray-900 dark:text-white">
-                          {product.name}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {product.validity}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                        product.network === 'MTN'
-                          ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
-                          : product.network === 'TELECEL'
-                          ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
-                          : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
-                      }`}>
-                        {product.network}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                      {formatCurrency(product.basePrice)}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
-                      {formatCurrency(product.sellingPrice)}
-                    </td>
-                    <td className="px-4 py-3 text-green-600 dark:text-green-400">
-                      {formatCurrency(product.sellingPrice - product.basePrice)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => toggleProductStatus(product)}
-                        className="flex items-center gap-1"
-                      >
-                        {product.isActive ? (
-                          <>
-                            <ToggleRight className="w-6 h-6 text-green-500" />
-                            <span className="text-xs text-green-600 dark:text-green-400">Active</span>
-                          </>
-                        ) : (
-                          <>
-                            <ToggleLeft className="w-6 h-6 text-gray-400" />
-                            <span className="text-xs text-gray-500">Inactive</span>
-                          </>
-                        )}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => openEditModal(product)}
-                          className="p-1.5 text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => deleteProduct(product._id)}
-                          className="p-1.5 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Search products..."
+          className="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+        />
       </div>
+
+      {/* Products Grid */}
+      {filteredProducts.length === 0 ? (
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-8 text-center">
+          <Package className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+          <p className="text-gray-600 dark:text-gray-400">No products found</p>
+          <button
+            onClick={openAddModal}
+            className="mt-4 text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
+          >
+            Add your first product
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredProducts.map((product) => {
+            const profit = product.sellingPrice - product.basePrice;
+            return (
+              <div
+                key={product._id}
+                className={`bg-white dark:bg-gray-800 rounded-xl border ${
+                  product.isActive
+                    ? 'border-gray-200 dark:border-gray-700'
+                    : 'border-gray-200 dark:border-gray-700 opacity-60'
+                } overflow-hidden`}
+              >
+                {/* Card Header with Network Icon */}
+                <div className="flex items-center gap-3 p-4 border-b border-gray-100 dark:border-gray-700">
+                  {getNetworkIcon(product.network, 44)}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-gray-900 dark:text-white truncate">
+                      {product.capacity}{product.capacityUnit} {NETWORK_LABELS[product.network]}
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {product.validity || '30 days'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => toggleProductStatus(product)}
+                    title={product.isActive ? 'Active — click to disable' : 'Inactive — click to enable'}
+                  >
+                    {product.isActive ? (
+                      <ToggleRight className="w-7 h-7 text-green-500" />
+                    ) : (
+                      <ToggleLeft className="w-7 h-7 text-gray-400" />
+                    )}
+                  </button>
+                </div>
+
+                {/* Pricing */}
+                <div className="p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">Base Cost</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">{formatCurrency(product.basePrice)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">Selling Price</span>
+                    <span className="text-lg font-bold text-gray-900 dark:text-white">{formatCurrency(product.sellingPrice)}</span>
+                  </div>
+                  <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-700">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">Your Profit</span>
+                    <span className={`text-sm font-semibold ${profit > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+                      {profit > 0 ? '+' : ''}{formatCurrency(profit)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center border-t border-gray-100 dark:border-gray-700">
+                  <button
+                    onClick={() => openEditModal(product)}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    Edit
+                  </button>
+                  <div className="w-px h-8 bg-gray-100 dark:bg-gray-700" />
+                  <button
+                    onClick={() => deleteProduct(product._id)}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 text-sm text-gray-600 dark:text-gray-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Add/Edit Modal */}
       {showModal && (
@@ -467,19 +499,34 @@ export default function ProductsPage() {
                 </div>
               )}
 
+              {/* Network Selector with Icons */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Network *
                 </label>
-                <select
-                  value={formData.network}
-                  onChange={(e) => setFormData({ ...formData, network: e.target.value, capacity: '', basePrice: '' })}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white"
-                >
-                  {NETWORKS.map(network => (
-                    <option key={network} value={network}>{network}</option>
+                <div className="grid grid-cols-3 gap-2">
+                  {NETWORKS.map(net => (
+                    <button
+                      key={net}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, network: net, capacity: '', basePrice: '' })}
+                      className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
+                        formData.network === net
+                          ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                      }`}
+                    >
+                      {getNetworkIcon(net, 36)}
+                      <span className={`text-xs font-medium ${
+                        formData.network === net
+                          ? 'text-indigo-700 dark:text-indigo-400'
+                          : 'text-gray-600 dark:text-gray-400'
+                      }`}>
+                        {NETWORK_LABELS[net]}
+                      </span>
+                    </button>
                   ))}
-                </select>
+                </div>
               </div>
 
               <div>
