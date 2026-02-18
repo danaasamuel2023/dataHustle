@@ -322,7 +322,7 @@ router.get('/dashboard/stats', auth, adminAuth, async (req, res) => {
       AgentStore.countDocuments(),
       AgentStore.countDocuments({ isActive: true }),
       AgentTransaction.countDocuments({ createdAt: { $gte: today }, orderStatus: 'completed' }),
-      StoreWithdrawal.countDocuments({ status: 'pending' }),
+      StoreWithdrawal.countDocuments({ status: { $in: ['pending', 'processing', 'queued'] } }),
       AgentTransaction.aggregate([
         { $match: { createdAt: { $gte: today }, orderStatus: 'completed' } },
         { $group: { _id: null, total: { $sum: '$netProfit' } } }
@@ -433,7 +433,7 @@ router.get('/investigation/summary', auth, adminAuth, async (req, res) => {
       ]),
       // Pending withdrawals
       StoreWithdrawal.aggregate([
-        { $match: { status: { $in: ['pending', 'processing'] } } },
+        { $match: { status: { $in: ['pending', 'processing', 'queued'] } } },
         {
           $group: {
             _id: null,
@@ -938,12 +938,22 @@ router.post('/withdrawals/return-to-balance/:withdrawalId', auth, adminAuth, asy
 
     session.startTransaction();
 
+    // Check if a refund was already processed for this withdrawal
+    const existingRefund = await WalletAuditLog.findOne({
+      storeId: withdrawal.storeId,
+      'source.referenceId': withdrawal.withdrawalId,
+      operation: 'refund'
+    }).session(session);
+
     const store = await AgentStore.findById(withdrawal.storeId).session(session);
     const balanceBefore = store.wallet.availableBalance;
 
-    // If status is failed, the funds might already be refunded
-    // Check pendingBalance - if it's >= requestedAmount, funds are still held
-    if (store.wallet.pendingBalance >= withdrawal.requestedAmount) {
+    if (existingRefund) {
+      // Already refunded (e.g. by queue processor for failed withdrawals)
+      // Just update status, don't touch wallet
+      console.log(`[RETURN_TO_BALANCE] Withdrawal ${withdrawalId} already refunded, skipping wallet update`);
+    } else if (store.wallet.pendingBalance >= withdrawal.requestedAmount) {
+      // Funds still in pending - move to available
       await AgentStore.findOneAndUpdate(
         { _id: withdrawal.storeId },
         {
@@ -951,8 +961,20 @@ router.post('/withdrawals/return-to-balance/:withdrawalId', auth, adminAuth, asy
         },
         { session }
       );
+
+      await new WalletAuditLog({
+        storeId: withdrawal.storeId,
+        operation: 'refund',
+        amount: withdrawal.requestedAmount,
+        balanceBefore,
+        balanceAfter: balanceBefore + withdrawal.requestedAmount,
+        source: { type: 'withdrawal_refund', referenceId: withdrawal.withdrawalId, referenceModel: 'StoreWithdrawal' },
+        performedBy: { userId: req.user._id, userType: 'admin' },
+        reason: `Admin returned to balance: ${reason || 'No reason provided'}`
+      }).save({ session });
     } else {
-      // Funds may have been partially or fully refunded already, just credit back
+      // Edge case: funds not in pending and no refund log (shouldn't normally happen)
+      // Credit back as safety measure
       await AgentStore.findOneAndUpdate(
         { _id: withdrawal.storeId },
         {
@@ -960,22 +982,22 @@ router.post('/withdrawals/return-to-balance/:withdrawalId', auth, adminAuth, asy
         },
         { session }
       );
+
+      await new WalletAuditLog({
+        storeId: withdrawal.storeId,
+        operation: 'refund',
+        amount: withdrawal.requestedAmount,
+        balanceBefore,
+        balanceAfter: balanceBefore + withdrawal.requestedAmount,
+        source: { type: 'withdrawal_refund', referenceId: withdrawal.withdrawalId, referenceModel: 'StoreWithdrawal' },
+        performedBy: { userId: req.user._id, userType: 'admin' },
+        reason: `Admin returned to balance (edge case): ${reason || 'No reason provided'}`
+      }).save({ session });
     }
 
     withdrawal.status = 'cancelled';
     withdrawal.processingDetails.failureReason = reason || 'Admin returned to balance';
     await withdrawal.save({ session });
-
-    await new WalletAuditLog({
-      storeId: withdrawal.storeId,
-      operation: 'refund',
-      amount: withdrawal.requestedAmount,
-      balanceBefore,
-      balanceAfter: balanceBefore + withdrawal.requestedAmount,
-      source: { type: 'withdrawal_refund', referenceId: withdrawal.withdrawalId, referenceModel: 'StoreWithdrawal' },
-      performedBy: { userId: req.user._id, userType: 'admin' },
-      reason: `Admin returned to balance: ${reason || 'No reason provided'}`
-    }).save({ session });
 
     await PaystackWithdrawalQueue.deleteMany({ withdrawalRef: withdrawal.withdrawalId }).session(session);
 
@@ -983,7 +1005,7 @@ router.post('/withdrawals/return-to-balance/:withdrawalId', auth, adminAuth, asy
 
     res.json({
       status: 'success',
-      message: 'Funds returned to agent wallet',
+      message: existingRefund ? 'Withdrawal cancelled (funds were already returned)' : 'Funds returned to agent wallet',
       data: { withdrawal }
     });
   } catch (error) {
@@ -997,6 +1019,7 @@ router.post('/withdrawals/return-to-balance/:withdrawalId', auth, adminAuth, asy
 
 // POST /withdrawals/retry/:withdrawalId - Retry failed withdrawal
 router.post('/withdrawals/retry/:withdrawalId', auth, adminAuth, async (req, res) => {
+  let sessionEnded = false;
   const session = await mongoose.startSession();
 
   try {
@@ -1005,10 +1028,12 @@ router.post('/withdrawals/retry/:withdrawalId', auth, adminAuth, async (req, res
     const withdrawal = await StoreWithdrawal.findOne({ withdrawalId });
 
     if (!withdrawal) {
+      session.endSession();
       return res.status(404).json({ status: 'error', message: 'Withdrawal not found' });
     }
 
     if (withdrawal.status !== 'failed') {
+      session.endSession();
       return res.status(400).json({ status: 'error', message: `Can only retry failed withdrawals. Current status: ${withdrawal.status}` });
     }
 
@@ -1044,8 +1069,9 @@ router.post('/withdrawals/retry/:withdrawalId', auth, adminAuth, async (req, res
 
     await session.commitTransaction();
     session.endSession();
+    sessionEnded = true;
 
-    // Now try the provider
+    // Now try the provider (outside transaction)
     const transferParams = {
       amount: withdrawal.netAmount,
       phone: withdrawal.paymentDetails.momoNumber,
@@ -1160,8 +1186,12 @@ router.post('/withdrawals/retry/:withdrawalId', auth, adminAuth, async (req, res
       data: { withdrawal, provider: usedProvider }
     });
   } catch (error) {
-    if (session.inTransaction()) await session.abortTransaction();
-    if (!session.hasEnded) session.endSession();
+    if (!sessionEnded) {
+      try {
+        if (session.inTransaction()) await session.abortTransaction();
+        session.endSession();
+      } catch (e) { /* session already ended */ }
+    }
     console.error('[RETRY_WITHDRAWAL] Error:', error);
     res.status(500).json({ status: 'error', message: error.message });
   }
@@ -1189,10 +1219,37 @@ router.post('/withdrawals/force-complete/:withdrawalId', auth, adminAuth, async 
 
     session.startTransaction();
 
-    // Move funds from pending to withdrawn
     const store = await AgentStore.findById(withdrawal.storeId).session(session);
 
-    if (store.wallet.pendingBalance >= withdrawal.requestedAmount) {
+    // Check if a refund was already processed (happens for failed withdrawals)
+    const existingRefund = await WalletAuditLog.findOne({
+      storeId: withdrawal.storeId,
+      'source.referenceId': withdrawal.withdrawalId,
+      operation: 'refund'
+    }).session(session);
+
+    if (existingRefund) {
+      // Failed withdrawal that was auto-refunded - money went back to available.
+      // Since admin confirms the MoMo transfer DID go through, we need to re-deduct from available.
+      if (store.wallet.availableBalance < withdrawal.requestedAmount) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({
+          status: 'error',
+          message: `Insufficient available balance. Agent has GH₵${store.wallet.availableBalance} but withdrawal is GH₵${withdrawal.requestedAmount}. The refund was already credited back.`
+        });
+      }
+
+      await AgentStore.findOneAndUpdate(
+        { _id: withdrawal.storeId, 'wallet.availableBalance': { $gte: withdrawal.requestedAmount } },
+        {
+          $inc: { 'wallet.availableBalance': -withdrawal.requestedAmount, 'wallet.totalWithdrawn': withdrawal.requestedAmount },
+          $set: { 'wallet.lastWithdrawal': new Date() }
+        },
+        { session }
+      );
+    } else if (store.wallet.pendingBalance >= withdrawal.requestedAmount) {
+      // Funds still in pending - move to withdrawn
       await AgentStore.findOneAndUpdate(
         { _id: withdrawal.storeId },
         {
@@ -1202,7 +1259,7 @@ router.post('/withdrawals/force-complete/:withdrawalId', auth, adminAuth, async 
         { session }
       );
     } else {
-      // Funds not in pending (already refunded or never held), just count as withdrawn
+      // Edge case: no refund and no pending funds - just count as withdrawn
       await AgentStore.findOneAndUpdate(
         { _id: withdrawal.storeId },
         {
@@ -1225,7 +1282,9 @@ router.post('/withdrawals/force-complete/:withdrawalId', auth, adminAuth, async 
       amount: -withdrawal.requestedAmount,
       source: { type: 'withdrawal', referenceId: withdrawal.withdrawalId, referenceModel: 'StoreWithdrawal' },
       performedBy: { userId: req.user._id, userType: 'admin' },
-      reason: 'Admin force-completed withdrawal'
+      reason: existingRefund
+        ? 'Admin force-completed (re-deducted from available after prior refund)'
+        : 'Admin force-completed withdrawal'
     }).save({ session });
 
     await PaystackWithdrawalQueue.deleteMany({ withdrawalRef: withdrawal.withdrawalId }).session(session);
