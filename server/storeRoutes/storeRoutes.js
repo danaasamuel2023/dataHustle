@@ -375,7 +375,20 @@ router.get('/stores/:storeSlug/payment/verify', async (req, res) => {
       return res.json({
         status: 'success',
         message: 'Order already completed',
-        data: { transaction }
+        data: {
+          transactionId: transaction.transactionId,
+          orderStatus: transaction.orderStatus,
+          fulfillmentStatus: transaction.fulfillmentStatus,
+          network: transaction.network,
+          capacity: transaction.capacity,
+          capacityUnit: transaction.capacityUnit,
+          recipientPhone: transaction.recipientPhone,
+          customerPhone: transaction.customerPhone,
+          sellingPrice: transaction.sellingPrice,
+          amount: transaction.customerPaid,
+          productName: transaction.productName,
+          createdAt: transaction.createdAt
+        }
       });
     }
 
@@ -386,16 +399,41 @@ router.get('/stores/:storeSlug/payment/verify', async (req, res) => {
       // Process the order
       await processCompletedPayment(transaction);
 
+      // Reload transaction to get updated status
+      const updatedTransaction = await AgentTransaction.findOne({ transactionId: reference });
+
       return res.json({
         status: 'success',
         message: 'Payment verified and order processing',
-        data: { transactionId: transaction.transactionId }
+        data: {
+          transactionId: updatedTransaction.transactionId,
+          orderStatus: updatedTransaction.orderStatus,
+          fulfillmentStatus: updatedTransaction.fulfillmentStatus,
+          network: updatedTransaction.network,
+          capacity: updatedTransaction.capacity,
+          capacityUnit: updatedTransaction.capacityUnit,
+          recipientPhone: updatedTransaction.recipientPhone,
+          customerPhone: updatedTransaction.customerPhone,
+          sellingPrice: updatedTransaction.sellingPrice,
+          amount: updatedTransaction.customerPaid,
+          productName: updatedTransaction.productName,
+          createdAt: updatedTransaction.createdAt
+        }
       });
     } else {
       return res.json({
         status: 'pending',
         message: 'Payment not yet confirmed',
-        data: { transactionId: transaction.transactionId }
+        data: {
+          transactionId: transaction.transactionId,
+          orderStatus: transaction.orderStatus,
+          network: transaction.network,
+          capacity: transaction.capacity,
+          capacityUnit: transaction.capacityUnit,
+          recipientPhone: transaction.recipientPhone,
+          sellingPrice: transaction.sellingPrice,
+          amount: transaction.customerPaid
+        }
       });
     }
   } catch (error) {
