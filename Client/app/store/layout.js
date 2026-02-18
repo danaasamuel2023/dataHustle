@@ -8,6 +8,7 @@ import {
   Store,
   LayoutDashboard,
   Package,
+  ShoppingCart,
   Wallet,
   Settings,
   Menu,
@@ -69,6 +70,7 @@ export default function StoreLayout({ children }) {
 
   const navigation = [
     { name: 'Dashboard', href: '/store', icon: LayoutDashboard },
+    { name: 'Orders', href: '/store/orders', icon: ShoppingCart },
     { name: 'Products', href: '/store/products', icon: Package },
     { name: 'Withdrawals', href: '/store/withdrawals', icon: Wallet },
     { name: 'Settings', href: '/store/settings', icon: Settings },
