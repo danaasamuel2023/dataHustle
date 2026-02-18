@@ -25,6 +25,7 @@ const sms = require('./smsRoutes/smsRoutes.js')
 const storeRoutes = require('./storeRoutes/storeRoutes.js');
 const withdrawalRoutes = require('./storeRoutes/withdrawalRoutes.js');
 const adminStoreRoutes = require('./storeRoutes/adminStoreRoutes.js');
+const settingsRoutes = require('./storeRoutes/settingsRoutes.js');
 
 dotenv.config();
 
@@ -62,6 +63,7 @@ app.use('/api/verifications', phoneVerification);
 app.use('/api/v1/agent-store', storeRoutes);
 app.use('/api/v1/agent-store', withdrawalRoutes);
 app.use('/api/v1/admin/agent-stores', adminStoreRoutes);
+app.use('/api/v1/settings', settingsRoutes);
 
 // Default Route
 app.get('/', (req, res) => {

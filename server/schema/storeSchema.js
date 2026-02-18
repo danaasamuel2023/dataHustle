@@ -340,17 +340,57 @@ const WalletAuditLogSchema = new mongoose.Schema({
 
 WalletAuditLogSchema.index({ storeId: 1, createdAt: -1 });
 
+// ===== PLATFORM SETTINGS SCHEMA =====
+const PlatformSettingsSchema = new mongoose.Schema({
+  // Singleton key
+  key: {
+    type: String,
+    default: "platform_settings",
+    unique: true
+  },
+
+  // Withdrawal provider settings
+  withdrawalProviders: {
+    activeProvider: {
+      type: String,
+      enum: ["moolre", "paystack", "bulkclix"],
+      default: "paystack"
+    },
+    minWithdrawal: { type: Number, default: 10 },
+    maxWithdrawal: { type: Number, default: 5000 },
+    feePercent: { type: Number, default: 2 },
+    fixedFee: { type: Number, default: 0 },
+
+    paystack: {
+      secretKey: { type: String, default: "" },
+      enabled: { type: Boolean, default: false }
+    },
+    moolre: {
+      apiKey: { type: String, default: "" },
+      enabled: { type: Boolean, default: false }
+    },
+    bulkclix: {
+      apiKey: { type: String, default: "" },
+      enabled: { type: Boolean, default: false }
+    }
+  },
+
+  updatedAt: { type: Date, default: Date.now }
+});
+
 // Export models
 const AgentStore = mongoose.models.AgentStoreHustle || mongoose.model("AgentStoreHustle", AgentStoreSchema);
 const AgentProduct = mongoose.models.AgentProductHustle || mongoose.model("AgentProductHustle", AgentProductSchema);
 const AgentTransaction = mongoose.models.AgentTransactionHustle || mongoose.model("AgentTransactionHustle", AgentTransactionSchema);
 const StoreWithdrawal = mongoose.models.StoreWithdrawalHustle || mongoose.model("StoreWithdrawalHustle", StoreWithdrawalSchema);
 const WalletAuditLog = mongoose.models.WalletAuditLogHustle || mongoose.model("WalletAuditLogHustle", WalletAuditLogSchema);
+const PlatformSettings = mongoose.models.PlatformSettingsHustle || mongoose.model("PlatformSettingsHustle", PlatformSettingsSchema);
 
 module.exports = {
   AgentStore,
   AgentProduct,
   AgentTransaction,
   StoreWithdrawal,
-  WalletAuditLog
+  WalletAuditLog,
+  PlatformSettings
 };

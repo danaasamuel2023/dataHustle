@@ -9,20 +9,38 @@ const {
   AgentStore,
   AgentTransaction,
   StoreWithdrawal,
-  WalletAuditLog
+  WalletAuditLog,
+  PlatformSettings
 } = require('../schema/storeSchema');
 
 // ===== PAYSTACK CONFIGURATION =====
 const PAYSTACK_BASE_URL = 'https://api.paystack.co';
-const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || process.env.PAYSTACK_SECRETE_KEY || 'sk_live_xxx';
 
-const paystackClient = axios.create({
-  baseURL: PAYSTACK_BASE_URL,
-  headers: {
-    'Authorization': `Bearer ${PAYSTACK_SECRET_KEY}`,
-    'Content-Type': 'application/json'
+// Get Paystack client dynamically from platform settings
+async function getPaystackClient() {
+  const settings = await PlatformSettings.findOne({ key: 'platform_settings' });
+  const secretKey = settings?.withdrawalProviders?.paystack?.secretKey
+    || process.env.PAYSTACK_SECRET_KEY
+    || process.env.PAYSTACK_SECRETE_KEY
+    || '';
+
+  return axios.create({
+    baseURL: PAYSTACK_BASE_URL,
+    headers: {
+      'Authorization': `Bearer ${secretKey}`,
+      'Content-Type': 'application/json'
+    }
+  });
+}
+
+// Get platform settings with defaults
+async function getPlatformSettings() {
+  let settings = await PlatformSettings.findOne({ key: 'platform_settings' });
+  if (!settings) {
+    settings = await PlatformSettings.create({ key: 'platform_settings' });
   }
-});
+  return settings;
+}
 
 // ===== HELPER FUNCTIONS =====
 const logOperation = (operation, data) => {
@@ -72,15 +90,18 @@ const getPaystackBankCode = (network) => {
 router.get('/stores/:storeId/withdrawal/settings', auth, verifyAgentOwnership, async (req, res) => {
   try {
     const store = req.store;
+    const settings = await getPlatformSettings();
+    const wp = settings.withdrawalProviders;
 
     res.json({
       status: 'success',
       data: {
         availableBalance: store.wallet.availableBalance,
         pendingBalance: store.wallet.pendingBalance,
-        minWithdrawal: 5,
-        maxWithdrawal: 5000,
-        fee: 0,
+        minWithdrawal: wp.minWithdrawal,
+        maxWithdrawal: wp.maxWithdrawal,
+        feePercent: wp.feePercent,
+        fixedFee: wp.fixedFee,
         methods: ['momo']
       }
     });
@@ -97,10 +118,16 @@ router.post('/stores/:storeId/withdrawal/request', auth, verifyAgentOwnership, a
   try {
     const { amount, momoNumber, momoNetwork, momoName } = req.body;
     const store = req.store;
+    const settings = await getPlatformSettings();
+    const wp = settings.withdrawalProviders;
 
     // Validation
-    if (!amount || amount < 5) {
-      return res.status(400).json({ status: 'error', message: 'Minimum withdrawal is GH₵5' });
+    if (!amount || amount < wp.minWithdrawal) {
+      return res.status(400).json({ status: 'error', message: `Minimum withdrawal is GH₵${wp.minWithdrawal}` });
+    }
+
+    if (amount > wp.maxWithdrawal) {
+      return res.status(400).json({ status: 'error', message: `Maximum withdrawal is GH₵${wp.maxWithdrawal}` });
     }
 
     if (!momoNumber || !momoNetwork) {
@@ -127,7 +154,7 @@ router.post('/stores/:storeId/withdrawal/request', auth, verifyAgentOwnership, a
     // Generate withdrawal ID
     const withdrawalId = `SWD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
-    const fee = 0; // No fee for now
+    const fee = Math.round(((amount * wp.feePercent / 100) + wp.fixedFee) * 100) / 100;
     const netAmount = amount - fee;
 
     // Create withdrawal record
@@ -215,6 +242,7 @@ router.post('/stores/:storeId/withdrawal/request', auth, verifyAgentOwnership, a
 // Process withdrawal via Paystack
 async function processPaystackWithdrawal(withdrawal, store) {
   try {
+    const paystackClient = await getPaystackClient();
     const bankCode = getPaystackBankCode(withdrawal.paymentDetails.momoNetwork);
     const momoNumber = withdrawal.paymentDetails.momoNumber.replace(/^0/, '');
 
@@ -306,6 +334,7 @@ async function pollTransferStatus(withdrawal, attempts = 0) {
     const transferCode = withdrawal.processingDetails?.paystackTransferCode;
     if (!transferCode) return;
 
+    const paystackClient = await getPaystackClient();
     const response = await paystackClient.get(`/transfer/${transferCode}`);
     const status = response.data.data.status;
 

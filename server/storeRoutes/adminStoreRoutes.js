@@ -404,4 +404,211 @@ router.get('/withdrawals', auth, adminAuth, async (req, res) => {
   }
 });
 
+// =============================================================================
+// INVESTIGATION SUMMARY (Admin Dashboard)
+// =============================================================================
+router.get('/investigation/summary', auth, adminAuth, async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const [
+      todayTxns,
+      pendingWithdrawals,
+      storesByStatus,
+      totalStoreBalance
+    ] = await Promise.all([
+      // Today's transactions
+      AgentTransaction.aggregate([
+        { $match: { createdAt: { $gte: today } } },
+        {
+          $group: {
+            _id: null,
+            count: { $sum: 1 },
+            totalAmount: { $sum: '$sellingPrice' },
+            totalProfit: { $sum: '$netProfit' }
+          }
+        }
+      ]),
+      // Pending withdrawals
+      StoreWithdrawal.aggregate([
+        { $match: { status: { $in: ['pending', 'processing'] } } },
+        {
+          $group: {
+            _id: null,
+            count: { $sum: 1 },
+            totalAmount: { $sum: '$requestedAmount' }
+          }
+        }
+      ]),
+      // Stores by status
+      AgentStore.aggregate([
+        {
+          $group: {
+            _id: { $cond: ['$isActive', 'active', 'inactive'] },
+            count: { $sum: 1 },
+            totalBalance: { $sum: '$wallet.availableBalance' }
+          }
+        }
+      ]),
+      // Total store balance
+      AgentStore.aggregate([
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            totalBalance: { $sum: '$wallet.availableBalance' }
+          }
+        }
+      ])
+    ]);
+
+    res.json({
+      status: 'success',
+      data: {
+        today: {
+          transactions: {
+            count: todayTxns[0]?.count || 0,
+            totalAmount: todayTxns[0]?.totalAmount || 0,
+            totalProfit: todayTxns[0]?.totalProfit || 0
+          }
+        },
+        pending: {
+          withdrawals: {
+            count: pendingWithdrawals[0]?.count || 0,
+            totalAmount: pendingWithdrawals[0]?.totalAmount || 0
+          }
+        },
+        stores: {
+          total: totalStoreBalance[0]?.total || 0,
+          totalBalance: totalStoreBalance[0]?.totalBalance || 0,
+          byStatus: storesByStatus
+        }
+      }
+    });
+  } catch (error) {
+    console.error('[INVESTIGATION_SUMMARY] Error:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// =============================================================================
+// TOP EARNERS (Admin Dashboard)
+// =============================================================================
+router.get('/agents/top-earners', auth, adminAuth, async (req, res) => {
+  try {
+    const { limit = 5, period = 'today' } = req.query;
+
+    const dateFilter = {};
+    const now = new Date();
+    if (period === 'today') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      dateFilter.createdAt = { $gte: today };
+    } else if (period === 'week') {
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      dateFilter.createdAt = { $gte: weekAgo };
+    } else if (period === 'month') {
+      const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      dateFilter.createdAt = { $gte: monthAgo };
+    }
+
+    const topEarners = await AgentTransaction.aggregate([
+      { $match: { ...dateFilter, orderStatus: 'completed' } },
+      {
+        $group: {
+          _id: '$storeId',
+          totalProfit: { $sum: '$netProfit' },
+          totalRevenue: { $sum: '$sellingPrice' },
+          orderCount: { $sum: 1 }
+        }
+      },
+      { $sort: { totalProfit: -1 } },
+      { $limit: parseInt(limit) },
+      {
+        $lookup: {
+          from: 'agentstorehustles',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'store'
+        }
+      },
+      { $unwind: { path: '$store', preserveNullAndEmptyArrays: true } }
+    ]);
+
+    res.json({
+      status: 'success',
+      data: {
+        topEarners: topEarners.map((e, index) => ({
+          rank: index + 1,
+          storeId: e._id,
+          storeName: e.store?.storeName || 'Unknown',
+          storeSlug: e.store?.storeSlug || '',
+          totalProfit: e.totalProfit,
+          totalRevenue: e.totalRevenue,
+          orderCount: e.orderCount
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('[TOP_EARNERS] Error:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// =============================================================================
+// RECENT ACTIVITY (Admin Dashboard)
+// =============================================================================
+router.get('/agents/recent-activity', auth, adminAuth, async (req, res) => {
+  try {
+    const { limit = 10 } = req.query;
+    const activityLimit = Math.min(parseInt(limit), 50);
+
+    // Get recent transactions and withdrawals, merge and sort
+    const [recentTransactions, recentWithdrawals] = await Promise.all([
+      AgentTransaction.find()
+        .sort({ createdAt: -1 })
+        .limit(activityLimit)
+        .populate({ path: 'storeId', select: 'storeName storeSlug' })
+        .lean(),
+      StoreWithdrawal.find()
+        .sort({ createdAt: -1 })
+        .limit(activityLimit)
+        .populate({ path: 'storeId', select: 'storeName storeSlug' })
+        .lean()
+    ]);
+
+    const activities = [
+      ...recentTransactions.map(t => ({
+        type: 'transaction',
+        storeName: t.storeId?.storeName || 'Unknown',
+        description: `${t.network} ${t.capacity}${t.capacityUnit || 'GB'} to ${t.recipientPhone || 'N/A'}`,
+        amount: t.sellingPrice,
+        profit: t.netProfit,
+        status: t.orderStatus,
+        createdAt: t.createdAt
+      })),
+      ...recentWithdrawals.map(w => ({
+        type: 'withdrawal',
+        storeName: w.storeId?.storeName || 'Unknown',
+        description: `Withdrawal via ${w.method} - ${w.withdrawalId}`,
+        amount: w.requestedAmount,
+        profit: 0,
+        status: w.status,
+        createdAt: w.createdAt
+      }))
+    ]
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, activityLimit);
+
+    res.json({
+      status: 'success',
+      data: { activities }
+    });
+  } catch (error) {
+    console.error('[RECENT_ACTIVITY] Error:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
 module.exports = router;
