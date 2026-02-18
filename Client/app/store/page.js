@@ -69,14 +69,14 @@ export default function StoreDashboard() {
         setDashboard(dashboardData.data);
       }
 
-      // Fetch recent orders
-      const ordersRes = await fetch(`${API_BASE}/agent-store/stores/${storeId}/orders?limit=5`, {
+      // Fetch recent orders (uses transactions endpoint)
+      const ordersRes = await fetch(`${API_BASE}/agent-store/stores/${storeId}/transactions?limit=5`, {
         headers: { 'x-auth-token': token }
       });
       const ordersData = await ordersRes.json();
 
       if (ordersData.status === 'success') {
-        setRecentOrders(ordersData.data.orders || []);
+        setRecentOrders(ordersData.data.transactions || []);
       }
     } catch (error) {
       console.error('Failed to fetch dashboard:', error);
@@ -309,26 +309,34 @@ export default function StoreDashboard() {
           </div>
         ) : (
           <div className="divide-y divide-gray-200 dark:divide-gray-700">
-            {recentOrders.map((order) => (
-              <div key={order._id} className="p-4 flex items-center justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900 dark:text-white truncate">
-                    {order.productName || 'Data Bundle'}
-                  </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {order.recipientPhone} • {order.network}
-                  </p>
+            {recentOrders.map((order) => {
+              const profit = (order.sellingPrice || 0) - (order.basePrice || 0);
+              return (
+                <div key={order._id} className="p-4 flex items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-gray-900 dark:text-white truncate">
+                        {order.network} {order.capacity}{order.capacityUnit || 'GB'}
+                      </p>
+                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(order.orderStatus)}`}>
+                        {order.orderStatus}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                      {order.recipientPhone} &middot; {new Date(order.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="font-medium text-gray-900 dark:text-white">
+                      {formatCurrency(order.sellingPrice)}
+                    </p>
+                    <p className={`text-xs font-medium ${profit > 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-500'}`}>
+                      {profit > 0 ? `+${formatCurrency(profit)}` : formatCurrency(profit)} profit
+                    </p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-medium text-gray-900 dark:text-white">
-                    {formatCurrency(order.sellingPrice)}
-                  </p>
-                  <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(order.orderStatus)}`}>
-                    {order.orderStatus}
-                  </span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
