@@ -8,7 +8,7 @@ const { User, DataPurchase, Transaction, DataInventory } = require('../schema/sc
 
 // Geonettech API Configuration
 const GEONETTECH_BASE_URL = 'https://connect.geonettech.com/api/v1';
-const GEONETTECH_API_KEY = process.env.GEONETTECH_API_KEY;
+const GEONETTECH_API_KEY = process.env.GEONETTECH_API_KEY || '21|rkrw7bcoGYjK8irAOTMaZ8sc1LRHYcwjuZnZmMNw4a6196f1';
 
 // Create Geonettech client
 const geonetClient = axios.create({

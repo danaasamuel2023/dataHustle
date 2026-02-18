@@ -18,7 +18,7 @@ const resetLimiter = rateLimit({
 
 // mNotify SMS configuration
 const SMS_CONFIG = {
-  API_KEY: process.env.MNOTIFY_API_KEY,
+  API_KEY: process.env.MNOTIFY_API_KEY || 'w3rGWhv4e235nDwYvD5gVDyrW',
   SENDER_ID: 'DataMartGH',
   BASE_URL: 'https://apps.mnotify.net/smsapi'
 };

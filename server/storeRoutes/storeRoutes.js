@@ -18,7 +18,7 @@ const {
 
 // ===== PAYSTACK CONFIGURATION =====
 const PAYSTACK_BASE_URL = 'https://api.paystack.co';
-const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || 'sk_live_b8f78b58b7860fd9795eb376a8602eba072d6e15';
 
 const paystackClient = axios.create({
   baseURL: PAYSTACK_BASE_URL,
@@ -30,7 +30,7 @@ const paystackClient = axios.create({
 
 // ===== DATAMART API CONFIGURATION =====
 const DATAMART_BASE_URL = 'https://api.datamartgh.shop';
-const DATAMART_API_KEY = process.env.DATAMART_API_KEY;
+const DATAMART_API_KEY = process.env.DATAMART_API_KEY || 'fb9b9e81e9640c1861605b4ec333e3bd57bdf70dcce461d766fa877c9c0f7553';
 
 const datamartClient = axios.create({
   baseURL: DATAMART_BASE_URL,
