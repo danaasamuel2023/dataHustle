@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell.exe -Command \"Get-ChildItem ''C:\\\\Users\\\\HP\\\\Desktop'' | Where-Object { $_.Name -like ''*store*'' -or $_.Name -like ''*hustle*'' } | Select-Object Name, FullName\")",
+      "Bash(cmd.exe /c \"dir C:\\\\Users\\\\HP\\\\Desktop\\\\datahustle-store\")",
+      "Bash(cmd.exe /c \"dir C:\\\\Users\\\\HP\\\\Desktop\\\\datahustle-store 2>&1\")",
+      "Bash(cmd.exe /c \"if exist C:\\\\Users\\\\HP\\\\Desktop\\\\datahustle-store \\(echo EXISTS\\) else \\(echo NOT_FOUND\\)\")"
+    ]
+  }
+}
