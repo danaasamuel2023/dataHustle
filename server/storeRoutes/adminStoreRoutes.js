@@ -1315,4 +1315,49 @@ router.post('/withdrawals/force-complete/:withdrawalId', auth, adminAuth, async 
   }
 });
 
+// =============================================================================
+// GET STUCK PROCESSING ORDERS (Admin) - Shows full DataMart response
+// =============================================================================
+router.get('/orders/stuck-processing', auth, adminAuth, async (req, res) => {
+  try {
+    const { page = 1, limit = 50 } = req.query;
+    const skip = (Math.max(1, parseInt(page)) - 1) * Math.min(100, parseInt(limit));
+
+    const orders = await AgentTransaction.find({ orderStatus: 'processing' })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Math.min(100, parseInt(limit)))
+      .lean();
+
+    const total = await AgentTransaction.countDocuments({ orderStatus: 'processing' });
+
+    res.json({
+      status: 'success',
+      total,
+      page: parseInt(page),
+      orders: orders.map(o => ({
+        transactionId: o.transactionId,
+        recipientPhone: o.recipientPhone,
+        network: o.network,
+        capacity: o.capacity,
+        sellingPrice: o.sellingPrice,
+        costPrice: o.costPrice,
+        netProfit: o.netProfit,
+        orderStatus: o.orderStatus,
+        fulfillmentStatus: o.fulfillmentStatus,
+        fulfillmentResponse: o.fulfillmentResponse,
+        datamartReference: o.datamartReference,
+        createdAt: o.createdAt,
+        paidAt: o.paidAt,
+        updatedAt: o.updatedAt,
+        storeId: o.storeId,
+        customerPhone: o.customerPhone
+      }))
+    });
+  } catch (error) {
+    console.error('[STUCK_PROCESSING] Error:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
 module.exports = router;
