@@ -39,27 +39,10 @@ const app = express();
 app.use(helmet()); // Sets secure HTTP headers (X-Content-Type-Options, X-Frame-Options, etc.)
 app.use(express.json({ limit: '10mb' })); // Limit request body size
 
-// CORS - restrict to your actual frontend domains
-const allowedOrigins = [
-  'http://localhost:3000',
-  'https://data-hustle.vercel.app',
-  'https://datahustle.vercel.app',
-  'https://www.datahustle.com',
-  'https://www.datavendo.shop'
-];
+// CORS
+app.use(cors());
 
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    return callback(new Error('Not allowed by CORS'));
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'x-auth-token', 'Authorization'],
-  credentials: true
-}));
+
 
 // Connect to Database
 ConnectDB();
