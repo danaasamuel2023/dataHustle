@@ -44,8 +44,16 @@ router.put('/', auth, adminAuth, async (req, res) => {
       const wp = updateData.withdrawalProviders;
 
       if (wp.activeProvider) settings.withdrawalProviders.activeProvider = wp.activeProvider;
+      if (wp.providerPriority) settings.withdrawalProviders.providerPriority = wp.providerPriority;
+      if (wp.enableAutoFallback !== undefined) settings.withdrawalProviders.enableAutoFallback = wp.enableAutoFallback;
+      if (wp.withdrawalsPaused !== undefined) {
+        settings.withdrawalProviders.withdrawalsPaused = wp.withdrawalsPaused;
+        if (wp.withdrawalsPaused) settings.withdrawalProviders.pausedAt = new Date();
+        if (wp.pauseReason !== undefined) settings.withdrawalProviders.pauseReason = wp.pauseReason;
+      }
       if (wp.minWithdrawal !== undefined) settings.withdrawalProviders.minWithdrawal = wp.minWithdrawal;
       if (wp.maxWithdrawal !== undefined) settings.withdrawalProviders.maxWithdrawal = wp.maxWithdrawal;
+      if (wp.dailyLimit !== undefined) settings.withdrawalProviders.dailyLimit = wp.dailyLimit;
       if (wp.feePercent !== undefined) settings.withdrawalProviders.feePercent = wp.feePercent;
       if (wp.fixedFee !== undefined) settings.withdrawalProviders.fixedFee = wp.fixedFee;
 
@@ -58,6 +66,8 @@ router.put('/', auth, adminAuth, async (req, res) => {
       // Moolre settings
       if (wp.moolre) {
         if (wp.moolre.apiKey !== undefined) settings.withdrawalProviders.moolre.apiKey = wp.moolre.apiKey;
+        if (wp.moolre.apiUser !== undefined) settings.withdrawalProviders.moolre.apiUser = wp.moolre.apiUser;
+        if (wp.moolre.accountNumber !== undefined) settings.withdrawalProviders.moolre.accountNumber = wp.moolre.accountNumber;
         if (wp.moolre.enabled !== undefined) settings.withdrawalProviders.moolre.enabled = wp.moolre.enabled;
       }
 

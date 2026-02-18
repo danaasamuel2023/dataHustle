@@ -70,8 +70,30 @@ app.get('/', (req, res) => {
   res.send('API is running...');
 });
 
+// =============================================================================
+// PAYSTACK WITHDRAWAL QUEUE PROCESSOR
+// Runs every 10 seconds to process queued withdrawals one at a time
+// =============================================================================
+const { processPaystackQueue, PaystackWithdrawalQueue } = require('./storeRoutes/withdrawalRoutes');
+
+setInterval(async () => {
+  try {
+    const queuedCount = await PaystackWithdrawalQueue.countDocuments({ status: 'queued' });
+    const processingCount = await PaystackWithdrawalQueue.countDocuments({ status: { $in: ['processing', 'polling'] } });
+
+    if (queuedCount > 0 || processingCount > 0) {
+      console.log(`[PAYSTACK_QUEUE] Status: ${queuedCount} queued, ${processingCount} processing/polling`);
+    }
+
+    await processPaystackQueue();
+  } catch (error) {
+    console.error('[PAYSTACK_QUEUE] Processor error:', error.message);
+  }
+}, 10000);
+
 // Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`[PAYSTACK_QUEUE] Queue processor started (every 10s)`);
 });

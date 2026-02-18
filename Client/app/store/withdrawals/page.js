@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Wallet,
@@ -16,7 +16,9 @@ import {
   TrendingUp,
   Zap,
   CreditCard,
-  Shield
+  Shield,
+  Search,
+  ChevronRight
 } from 'lucide-react';
 
 const API_BASE = 'https://datahustle.onrender.com/api/v1';
@@ -37,6 +39,8 @@ export default function WithdrawalsPage() {
   const [success, setSuccess] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState('all');
+  const [checkingStatus, setCheckingStatus] = useState(null);
+  const [statusResult, setStatusResult] = useState(null);
 
   const [formData, setFormData] = useState({
     amount: '',
@@ -50,15 +54,11 @@ export default function WithdrawalsPage() {
     return localStorage.getItem('authToken');
   };
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     const token = getAuthToken();
-    if (!token) {
-      router.push('/SignIn');
-      return;
-    }
+    if (!token) { router.push('/SignIn'); return; }
 
     try {
-      // Fetch store
       const storeRes = await fetch(`${API_BASE}/agent-store/stores/my-store`, {
         headers: { 'x-auth-token': token }
       });
@@ -72,7 +72,6 @@ export default function WithdrawalsPage() {
       setStore(storeData.data.store);
       const storeId = storeData.data.store._id;
 
-      // Fetch withdrawals
       const withdrawalsRes = await fetch(`${API_BASE}/agent-store/stores/${storeId}/withdrawals`, {
         headers: { 'x-auth-token': token }
       });
@@ -81,21 +80,51 @@ export default function WithdrawalsPage() {
       if (withdrawalsData.status === 'success') {
         setWithdrawals(withdrawalsData.data.withdrawals || []);
       }
-    } catch (error) {
-      console.error('Failed to fetch data:', error);
+    } catch (err) {
+      console.error('Failed to fetch data:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
-
-  useEffect(() => {
-    fetchData();
   }, [router]);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchData();
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Auto-refresh every 15s if there's a pending/queued/processing withdrawal
+  useEffect(() => {
+    const hasPending = withdrawals.some(w => ['pending', 'processing', 'queued'].includes(w.status));
+    if (!hasPending) return;
+
+    const interval = setInterval(() => { fetchData(); }, 15000);
+    return () => clearInterval(interval);
+  }, [withdrawals, fetchData]);
+
+  const handleRefresh = () => { setRefreshing(true); fetchData(); };
+
+  const handleCheckStatus = async (withdrawal) => {
+    const token = getAuthToken();
+    if (!token || !store) return;
+
+    setCheckingStatus(withdrawal.withdrawalId);
+    setStatusResult(null);
+
+    try {
+      const res = await fetch(
+        `${API_BASE}/agent-store/stores/${store._id}/check-status/${withdrawal.withdrawalId}`,
+        { method: 'POST', headers: { 'x-auth-token': token, 'Content-Type': 'application/json' } }
+      );
+      const data = await res.json();
+
+      if (data.status === 'success') {
+        setStatusResult(data.data);
+        // Refresh data to get updated status
+        fetchData();
+      }
+    } catch (err) {
+      console.error('Status check failed:', err);
+    } finally {
+      setCheckingStatus(null);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -109,50 +138,38 @@ export default function WithdrawalsPage() {
 
     const amount = parseFloat(formData.amount);
 
-    // Validation
-    if (amount < 5) {
-      setError('Minimum withdrawal is GH₵5');
-      setSubmitting(false);
-      return;
-    }
-
-    if (amount > store.wallet.availableBalance) {
-      setError('Insufficient balance');
-      setSubmitting(false);
-      return;
-    }
-
-    if (!formData.momoNumber || formData.momoNumber.length < 10) {
-      setError('Please enter a valid phone number');
-      setSubmitting(false);
-      return;
-    }
+    if (amount < 5) { setError('Minimum withdrawal is GH₵5'); setSubmitting(false); return; }
+    if (amount > store.wallet.availableBalance) { setError('Insufficient balance'); setSubmitting(false); return; }
+    if (!formData.momoNumber || formData.momoNumber.length < 10) { setError('Please enter a valid phone number'); setSubmitting(false); return; }
 
     try {
       const res = await fetch(`${API_BASE}/agent-store/stores/${store._id}/withdrawal/request`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-auth-token': token
-        },
+        headers: { 'Content-Type': 'application/json', 'x-auth-token': token },
         body: JSON.stringify({
-          amount,
-          momoNumber: formData.momoNumber,
-          momoNetwork: formData.momoNetwork,
-          momoName: formData.momoName
+          amount, momoNumber: formData.momoNumber,
+          momoNetwork: formData.momoNetwork, momoName: formData.momoName
         })
       });
 
       const data = await res.json();
 
       if (data.status === 'success') {
-        setSuccess('Withdrawal request submitted successfully! Money will be sent to your MoMo shortly.');
+        const isQueued = data.data?.queuedForProcessing;
+        const provider = data.data?.provider;
+        setSuccess(
+          isQueued
+            ? `Withdrawal queued! Position #${data.data.queuePosition || 1}. Your money will be sent via ${provider} shortly.`
+            : data.data?.immediateCompletion
+              ? 'Withdrawal completed! Money has been sent to your MoMo.'
+              : 'Withdrawal processing! Money will be sent to your MoMo shortly.'
+        );
         setFormData({ amount: '', momoNumber: '', momoNetwork: 'mtn', momoName: '' });
         fetchData();
       } else {
         setError(data.message || 'Failed to submit withdrawal');
       }
-    } catch (error) {
+    } catch (err) {
       setError('Failed to submit withdrawal request');
     } finally {
       setSubmitting(false);
@@ -160,55 +177,44 @@ export default function WithdrawalsPage() {
   };
 
   const formatCurrency = (amount) => `GH₵${(amount || 0).toFixed(2)}`;
-
-  const formatDate = (date) => {
-    return new Date(date).toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  const formatDate = (date) => new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'completed':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case 'pending':
-      case 'processing':
-      case 'queued':
-        return <Clock className="w-4 h-4 text-yellow-500" />;
-      case 'failed':
-        return <XCircle className="w-4 h-4 text-red-500" />;
-      default:
-        return <Clock className="w-4 h-4 text-gray-500" />;
+      case 'completed': return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case 'pending': case 'processing': case 'queued': return <Clock className="w-4 h-4 text-yellow-500" />;
+      case 'failed': return <XCircle className="w-4 h-4 text-red-500" />;
+      default: return <Clock className="w-4 h-4 text-gray-500" />;
     }
   };
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'completed':
-        return 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/30';
-      case 'pending':
-      case 'processing':
-      case 'queued':
-        return 'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-500/30';
-      case 'failed':
-        return 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-500/30';
-      default:
-        return 'bg-gray-100 dark:bg-gray-500/20 text-gray-700 dark:text-gray-400 border-gray-200 dark:border-gray-500/30';
+      case 'completed': return 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/30';
+      case 'pending': case 'processing': return 'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-500/30';
+      case 'queued': return 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/30';
+      case 'failed': return 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-500/30';
+      default: return 'bg-gray-100 dark:bg-gray-500/20 text-gray-700 dark:text-gray-400 border-gray-200 dark:border-gray-500/30';
     }
   };
 
-  // Filter withdrawals
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 'queued': return 'In Queue';
+      case 'processing': return 'Processing';
+      case 'pending': return 'Pending';
+      case 'completed': return 'Completed';
+      case 'failed': return 'Failed';
+      default: return status;
+    }
+  };
+
   const filteredWithdrawals = filter === 'all'
     ? withdrawals
-    : withdrawals.filter(w => w.status === filter);
+    : withdrawals.filter(w => filter === 'pending' ? ['pending', 'processing', 'queued'].includes(w.status) : w.status === filter);
 
-  // Calculate fee and net
   const amount = parseFloat(formData.amount) || 0;
-  const fee = amount * 0.01; // 1% fee
+  const fee = amount * 0.01;
   const netAmount = amount - fee;
 
   if (loading) {
@@ -223,6 +229,7 @@ export default function WithdrawalsPage() {
   }
 
   const hasPendingWithdrawal = withdrawals.some(w => ['pending', 'processing', 'queued'].includes(w.status));
+  const activeWithdrawal = withdrawals.find(w => ['pending', 'processing', 'queued'].includes(w.status));
 
   return (
     <div className="space-y-6">
@@ -246,6 +253,72 @@ export default function WithdrawalsPage() {
         </button>
       </div>
 
+      {/* Active Withdrawal Status Card */}
+      {activeWithdrawal && (
+        <div className={`rounded-2xl border-2 p-5 ${
+          activeWithdrawal.status === 'queued'
+            ? 'bg-blue-50 dark:bg-blue-500/10 border-blue-300 dark:border-blue-500/30'
+            : 'bg-yellow-50 dark:bg-yellow-500/10 border-yellow-300 dark:border-yellow-500/30'
+        }`}>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className={`p-3 rounded-xl ${
+                activeWithdrawal.status === 'queued'
+                  ? 'bg-blue-100 dark:bg-blue-500/20'
+                  : 'bg-yellow-100 dark:bg-yellow-500/20'
+              }`}>
+                {activeWithdrawal.status === 'queued' ? (
+                  <Clock className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-pulse" />
+                ) : (
+                  <Loader2 className="w-6 h-6 text-yellow-600 dark:text-yellow-400 animate-spin" />
+                )}
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900 dark:text-white text-lg">
+                  {activeWithdrawal.status === 'queued' ? 'Withdrawal In Queue' : 'Withdrawal Processing'}
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
+                  {formatCurrency(activeWithdrawal.requestedAmount)} to {activeWithdrawal.paymentDetails?.momoNetwork?.toUpperCase()} {activeWithdrawal.paymentDetails?.momoNumber}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1 font-mono">
+                  {activeWithdrawal.withdrawalId}
+                </p>
+                {activeWithdrawal.processingDetails?.provider && (
+                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                    Provider: {activeWithdrawal.processingDetails.provider}
+                  </p>
+                )}
+
+                {/* Status result */}
+                {statusResult && statusResult.withdrawalId === activeWithdrawal.withdrawalId && (
+                  <div className="mt-2 p-2 bg-white dark:bg-gray-800 rounded-lg text-sm">
+                    <p className="text-gray-700 dark:text-gray-300">
+                      Status: <span className="font-bold">{statusResult.status}</span>
+                    </p>
+                    {statusResult.queuePosition && (
+                      <p className="text-gray-600 dark:text-gray-400">
+                        Queue position: #{statusResult.queuePosition} ({statusResult.estimatedTime})
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => handleCheckStatus(activeWithdrawal)}
+              disabled={checkingStatus === activeWithdrawal.withdrawalId}
+              className="px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+            >
+              {checkingStatus === activeWithdrawal.withdrawalId ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Checking...</>
+              ) : (
+                <><Search className="w-4 h-4" /> Check Status</>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Balance & Form */}
         <div className="space-y-5">
@@ -260,30 +333,47 @@ export default function WithdrawalsPage() {
             <p className="text-4xl font-bold mb-2">
               {formatCurrency(store?.wallet?.availableBalance)}
             </p>
-            <div className="flex items-center gap-2 text-indigo-200 text-sm">
-              <TrendingUp className="w-4 h-4" />
-              <span>Total Earned: {formatCurrency(store?.wallet?.totalEarnings)}</span>
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-1 text-indigo-200">
+                <TrendingUp className="w-4 h-4" />
+                <span>Earned: {formatCurrency(store?.wallet?.totalEarnings)}</span>
+              </div>
+              {store?.wallet?.pendingBalance > 0 && (
+                <div className="flex items-center gap-1 text-yellow-200">
+                  <Clock className="w-4 h-4" />
+                  <span>Pending: {formatCurrency(store?.wallet?.pendingBalance)}</span>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Quick Stats */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-              <div className="flex items-center gap-2 text-green-600 dark:text-green-400 mb-1">
-                <CheckCircle className="w-4 h-4" />
-                <span className="text-xs font-medium">Completed</span>
+              <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400 mb-1">
+                <CheckCircle className="w-3.5 h-3.5" />
+                <span className="text-xs font-medium">Done</span>
               </div>
               <p className="text-xl font-bold text-gray-900 dark:text-white">
                 {withdrawals.filter(w => w.status === 'completed').length}
               </p>
             </div>
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-              <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400 mb-1">
-                <Clock className="w-4 h-4" />
-                <span className="text-xs font-medium">Pending</span>
+              <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 mb-1">
+                <Clock className="w-3.5 h-3.5" />
+                <span className="text-xs font-medium">Queued</span>
               </div>
               <p className="text-xl font-bold text-gray-900 dark:text-white">
-                {withdrawals.filter(w => ['pending', 'processing', 'queued'].includes(w.status)).length}
+                {withdrawals.filter(w => w.status === 'queued').length}
+              </p>
+            </div>
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-1.5 text-red-600 dark:text-red-400 mb-1">
+                <XCircle className="w-3.5 h-3.5" />
+                <span className="text-xs font-medium">Failed</span>
+              </div>
+              <p className="text-xl font-bold text-gray-900 dark:text-white">
+                {withdrawals.filter(w => w.status === 'failed').length}
               </p>
             </div>
           </div>
@@ -319,16 +409,11 @@ export default function WithdrawalsPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Amount */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Amount (GH₵)
-                </label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Amount (GH₵)</label>
                 <input
-                  type="number"
-                  value={formData.amount}
+                  type="number" value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                  placeholder="0.00"
-                  min="5"
-                  step="0.01"
+                  placeholder="0.00" min="5" step="0.01"
                   disabled={hasPendingWithdrawal || submitting}
                   className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white text-lg font-bold placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50 transition-all"
                 />
@@ -351,14 +436,10 @@ export default function WithdrawalsPage() {
 
               {/* Network */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Mobile Network
-                </label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Mobile Network</label>
                 <div className="grid grid-cols-3 gap-2">
                   {NETWORKS.map(network => (
-                    <button
-                      key={network.value}
-                      type="button"
+                    <button key={network.value} type="button"
                       onClick={() => setFormData({ ...formData, momoNetwork: network.value })}
                       disabled={hasPendingWithdrawal || submitting}
                       className={`p-3 rounded-xl border-2 text-center transition-all disabled:opacity-50 ${
@@ -367,7 +448,7 @@ export default function WithdrawalsPage() {
                           : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500'
                       }`}
                     >
-                      <span className="text-xs font-medium">{network.value.toUpperCase()}</span>
+                      <span className="text-xs font-medium">{network.value === 'vodafone' ? 'TELECEL' : network.value.toUpperCase()}</span>
                     </button>
                   ))}
                 </div>
@@ -375,17 +456,12 @@ export default function WithdrawalsPage() {
 
               {/* Phone Number */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Phone Number
-                </label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Phone Number</label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
-                  <input
-                    type="tel"
-                    value={formData.momoNumber}
+                  <input type="tel" value={formData.momoNumber}
                     onChange={(e) => setFormData({ ...formData, momoNumber: e.target.value.replace(/\D/g, '').slice(0, 10) })}
-                    placeholder="0241234567"
-                    disabled={hasPendingWithdrawal || submitting}
+                    placeholder="0241234567" disabled={hasPendingWithdrawal || submitting}
                     className="w-full pl-11 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50 transition-all"
                   />
                 </div>
@@ -393,39 +469,22 @@ export default function WithdrawalsPage() {
 
               {/* Account Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Account Name (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={formData.momoName}
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Account Name (Optional)</label>
+                <input type="text" value={formData.momoName}
                   onChange={(e) => setFormData({ ...formData, momoName: e.target.value })}
-                  placeholder="Name on MoMo account"
-                  disabled={hasPendingWithdrawal || submitting}
+                  placeholder="Name on MoMo account" disabled={hasPendingWithdrawal || submitting}
                   className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50 transition-all"
                 />
               </div>
 
-              {/* Submit Button */}
-              <button
-                type="submit"
+              {/* Submit */}
+              <button type="submit"
                 disabled={submitting || hasPendingWithdrawal || !formData.amount || !formData.momoNumber}
                 className="w-full py-3.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 dark:disabled:from-gray-600 dark:disabled:to-gray-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg disabled:shadow-none"
               >
-                {submitting ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <ArrowDownToLine className="w-5 h-5" />
-                    Withdraw to MoMo
-                  </>
-                )}
+                {submitting ? (<><Loader2 className="w-5 h-5 animate-spin" /> Processing...</>) : (<><ArrowDownToLine className="w-5 h-5" /> Withdraw to MoMo</>)}
               </button>
 
-              {/* Security Note */}
               <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                 <Shield className="w-4 h-4" />
                 <span>Secure withdrawal processed via mobile money</span>
@@ -443,16 +502,10 @@ export default function WithdrawalsPage() {
                 <h2 className="font-bold text-gray-900 dark:text-white">Withdrawal History</h2>
                 <div className="flex gap-2 flex-wrap">
                   {['all', 'completed', 'pending', 'failed'].map((status) => {
-                    const count = status === 'all'
-                      ? withdrawals.length
-                      : withdrawals.filter(w => status === 'pending'
-                          ? ['pending', 'processing', 'queued'].includes(w.status)
-                          : w.status === status
-                        ).length;
+                    const count = status === 'all' ? withdrawals.length
+                      : withdrawals.filter(w => status === 'pending' ? ['pending', 'processing', 'queued'].includes(w.status) : w.status === status).length;
                     return (
-                      <button
-                        key={status}
-                        onClick={() => setFilter(status)}
+                      <button key={status} onClick={() => setFilter(status)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                           filter === status
                             ? 'bg-indigo-500 text-white'
@@ -473,9 +526,7 @@ export default function WithdrawalsPage() {
               <div className="p-12 text-center">
                 <Wallet className="w-14 h-14 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
                 <p className="text-gray-600 dark:text-gray-400 font-medium">No withdrawals yet</p>
-                <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
-                  Your withdrawal history will appear here
-                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">Your withdrawal history will appear here</p>
               </div>
             ) : (
               <div className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -485,9 +536,13 @@ export default function WithdrawalsPage() {
                       <div className="flex items-start gap-3">
                         <div className={`p-2.5 rounded-xl ${
                           withdrawal.status === 'completed' ? 'bg-green-100 dark:bg-green-500/20' :
-                          withdrawal.status === 'failed' ? 'bg-red-100 dark:bg-red-500/20' : 'bg-yellow-100 dark:bg-yellow-500/20'
+                          withdrawal.status === 'failed' ? 'bg-red-100 dark:bg-red-500/20' :
+                          withdrawal.status === 'queued' ? 'bg-blue-100 dark:bg-blue-500/20' :
+                          'bg-yellow-100 dark:bg-yellow-500/20'
                         }`}>
-                          {getStatusIcon(withdrawal.status)}
+                          {withdrawal.status === 'queued' ? (
+                            <Clock className="w-4 h-4 text-blue-500" />
+                          ) : getStatusIcon(withdrawal.status)}
                         </div>
                         <div>
                           <p className="font-bold text-gray-900 dark:text-white text-lg">
@@ -496,26 +551,47 @@ export default function WithdrawalsPage() {
                           <div className="flex items-center gap-2 mt-1">
                             <CreditCard className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
                             <span className="text-sm text-gray-600 dark:text-gray-400">
-                              {withdrawal.paymentDetails?.momoNetwork?.toUpperCase()} • {withdrawal.paymentDetails?.momoNumber}
+                              {withdrawal.paymentDetails?.momoNetwork?.toUpperCase()} {withdrawal.paymentDetails?.momoNumber}
                             </span>
                           </div>
                           <p className="text-xs text-gray-500 dark:text-gray-500 mt-1 font-mono">
                             {withdrawal.withdrawalId}
                           </p>
+                          {withdrawal.processingDetails?.provider && (
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              via {withdrawal.processingDetails.provider}
+                              {withdrawal.processingDetails.fallbackUsed && ' (fallback)'}
+                            </p>
+                          )}
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right flex flex-col items-end gap-2">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border ${getStatusColor(withdrawal.status)}`}>
-                          {getStatusIcon(withdrawal.status)}
-                          {withdrawal.status}
+                          {withdrawal.status === 'queued' ? <Clock className="w-3.5 h-3.5" /> : getStatusIcon(withdrawal.status)}
+                          {getStatusLabel(withdrawal.status)}
                         </span>
-                        <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                        <p className="text-xs text-gray-500 dark:text-gray-500">
                           {formatDate(withdrawal.createdAt)}
                         </p>
                         {withdrawal.netAmount && (
-                          <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                          <p className="text-xs text-green-600 dark:text-green-400">
                             Net: {formatCurrency(withdrawal.netAmount)}
                           </p>
+                        )}
+                        {/* Check status button for active withdrawals */}
+                        {['processing', 'queued'].includes(withdrawal.status) && (
+                          <button
+                            onClick={() => handleCheckStatus(withdrawal)}
+                            disabled={checkingStatus === withdrawal.withdrawalId}
+                            className="mt-1 px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-lg text-xs font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center gap-1 disabled:opacity-50"
+                          >
+                            {checkingStatus === withdrawal.withdrawalId ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <ChevronRight className="w-3 h-3" />
+                            )}
+                            Check
+                          </button>
                         )}
                       </div>
                     </div>
@@ -532,10 +608,12 @@ export default function WithdrawalsPage() {
               <div>
                 <h3 className="text-gray-900 dark:text-white font-medium text-sm">How withdrawals work</h3>
                 <ul className="mt-2 space-y-1.5 text-xs text-gray-600 dark:text-gray-400">
-                  <li>• Minimum withdrawal: GH₵5</li>
-                  <li>• 1% processing fee applies</li>
-                  <li>• Money is sent directly to your MoMo</li>
-                  <li>• Processing time: 5-30 minutes</li>
+                  <li>Minimum withdrawal: GH₵5</li>
+                  <li>1% processing fee applies</li>
+                  <li>Money is sent directly to your MoMo</li>
+                  <li>Queued withdrawals process in 1-5 minutes</li>
+                  <li>Page auto-refreshes while withdrawal is active</li>
+                  <li>Failed withdrawals are automatically refunded</li>
                 </ul>
               </div>
             </div>

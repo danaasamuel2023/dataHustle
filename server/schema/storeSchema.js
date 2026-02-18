@@ -279,18 +279,28 @@ const StoreWithdrawalSchema = new mongoose.Schema({
   // Status
   status: {
     type: String,
-    enum: ["pending", "processing", "completed", "failed", "cancelled"],
+    enum: ["pending", "processing", "queued", "completed", "failed", "cancelled"],
     default: "pending"
   },
 
   // Processing
   processingDetails: {
     provider: String,
+    gateway: String,
     paystackTransferCode: String,
     paystackRecipientCode: String,
+    initiatedAt: Date,
+    initiatedBy: String,
     processedAt: Date,
-    failureReason: String
+    completedAt: Date,
+    failureReason: String,
+    queuedAt: Date,
+    fallbackUsed: { type: Boolean, default: false },
+    primaryProviderError: String
   },
+
+  paymentReference: String,
+  agentNotes: String,
 
   createdAt: { type: Date, default: Date.now },
   completedAt: Date
@@ -310,7 +320,7 @@ const WalletAuditLogSchema = new mongoose.Schema({
 
   operation: {
     type: String,
-    enum: ["credit", "debit", "withdrawal", "refund", "correction", "admin_adjustment"],
+    enum: ["credit", "debit", "withdrawal", "withdrawal_hold", "withdrawal_complete", "refund", "correction", "admin_adjustment"],
     required: true
   },
 
@@ -353,30 +363,113 @@ const PlatformSettingsSchema = new mongoose.Schema({
   withdrawalProviders: {
     activeProvider: {
       type: String,
-      enum: ["moolre", "paystack", "bulkclix"],
+      enum: ["auto", "moolre", "paystack", "bulkclix"],
       default: "paystack"
     },
+    providerPriority: {
+      type: [String],
+      default: ["paystack", "moolre", "bulkclix"]
+    },
+    enableAutoFallback: { type: Boolean, default: true },
+
+    // Pause withdrawals globally
+    withdrawalsPaused: { type: Boolean, default: false },
+    pauseReason: String,
+    pausedAt: Date,
+
     minWithdrawal: { type: Number, default: 10 },
     maxWithdrawal: { type: Number, default: 5000 },
-    feePercent: { type: Number, default: 2 },
+    dailyLimit: { type: Number, default: 3000 },
+    feePercent: { type: Number, default: 1 },
     fixedFee: { type: Number, default: 0 },
 
     paystack: {
       secretKey: { type: String, default: "" },
-      enabled: { type: Boolean, default: false }
+      enabled: { type: Boolean, default: false },
+      lastUsed: Date,
+      successCount: { type: Number, default: 0 },
+      failureCount: { type: Number, default: 0 },
+      totalAmountProcessed: { type: Number, default: 0 },
+      lastError: String
     },
     moolre: {
       apiKey: { type: String, default: "" },
-      enabled: { type: Boolean, default: false }
+      apiUser: { type: String, default: "" },
+      accountNumber: { type: String, default: "" },
+      enabled: { type: Boolean, default: false },
+      lastUsed: Date,
+      successCount: { type: Number, default: 0 },
+      failureCount: { type: Number, default: 0 },
+      totalAmountProcessed: { type: Number, default: 0 },
+      lastError: String
     },
     bulkclix: {
       apiKey: { type: String, default: "" },
-      enabled: { type: Boolean, default: false }
+      enabled: { type: Boolean, default: false },
+      lastUsed: Date,
+      successCount: { type: Number, default: 0 },
+      failureCount: { type: Number, default: 0 },
+      totalAmountProcessed: { type: Number, default: 0 },
+      lastError: String
     }
   },
 
   updatedAt: { type: Date, default: Date.now }
 });
+
+// ===== PAYSTACK WITHDRAWAL QUEUE SCHEMA =====
+const PaystackWithdrawalQueueSchema = new mongoose.Schema({
+  withdrawalId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "StoreWithdrawalHustle",
+    required: true,
+    index: true
+  },
+  withdrawalRef: {
+    type: String,
+    required: true,
+    index: true
+  },
+  storeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "AgentStoreHustle",
+    required: true
+  },
+
+  // Queue status
+  status: {
+    type: String,
+    enum: ["queued", "processing", "polling", "background_polling", "completed", "failed"],
+    default: "queued",
+    index: true
+  },
+
+  // Queue timing
+  queuedAt: { type: Date, default: Date.now, index: true },
+  processingStartedAt: Date,
+  completedAt: Date,
+
+  // Paystack transfer details
+  recipientCode: String,
+  transferCode: String,
+
+  // Polling tracking
+  pollAttempts: { type: Number, default: 0 },
+  maxPollAttempts: { type: Number, default: 30 },
+  lastPolledAt: Date,
+  nextPollAt: Date,
+
+  // Error tracking
+  error: String,
+  statusHistory: [{
+    status: String,
+    checkedAt: { type: Date, default: Date.now },
+    message: String
+  }]
+});
+
+PaystackWithdrawalQueueSchema.index({ status: 1, queuedAt: 1 });
+PaystackWithdrawalQueueSchema.index({ status: 1, nextPollAt: 1 });
 
 // Export models
 const AgentStore = mongoose.models.AgentStoreHustle || mongoose.model("AgentStoreHustle", AgentStoreSchema);
@@ -385,6 +478,7 @@ const AgentTransaction = mongoose.models.AgentTransactionHustle || mongoose.mode
 const StoreWithdrawal = mongoose.models.StoreWithdrawalHustle || mongoose.model("StoreWithdrawalHustle", StoreWithdrawalSchema);
 const WalletAuditLog = mongoose.models.WalletAuditLogHustle || mongoose.model("WalletAuditLogHustle", WalletAuditLogSchema);
 const PlatformSettings = mongoose.models.PlatformSettingsHustle || mongoose.model("PlatformSettingsHustle", PlatformSettingsSchema);
+const PaystackWithdrawalQueue = mongoose.models.PaystackWithdrawalQueueHustle || mongoose.model("PaystackWithdrawalQueueHustle", PaystackWithdrawalQueueSchema);
 
 module.exports = {
   AgentStore,
@@ -392,5 +486,6 @@ module.exports = {
   AgentTransaction,
   StoreWithdrawal,
   WalletAuditLog,
-  PlatformSettings
+  PlatformSettings,
+  PaystackWithdrawalQueue
 };
