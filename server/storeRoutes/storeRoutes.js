@@ -18,7 +18,7 @@ const {
 
 // ===== PAYSTACK CONFIGURATION =====
 const PAYSTACK_BASE_URL = 'https://api.paystack.co';
-const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRETE_KEY || 'sk_live_xxx';
+const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || process.env.PAYSTACK_SECRETE_KEY || 'sk_live_xxx';
 
 const paystackClient = axios.create({
   baseURL: PAYSTACK_BASE_URL,
@@ -344,6 +344,7 @@ router.post('/stores/:storeSlug/purchase/initialize', async (req, res) => {
       status: 'success',
       data: {
         transactionId,
+        authorizationUrl: paystackResponse.data.data.authorization_url,
         paymentUrl: paystackResponse.data.data.authorization_url,
         reference: paystackResponse.data.data.reference,
         amount: product.sellingPrice
