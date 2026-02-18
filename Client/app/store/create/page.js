@@ -27,25 +27,50 @@ const STEPS = [
 
 const NETWORKS = ['MTN', 'TELECEL', 'AT'];
 
+// Must match backend OFFICIAL_PRICING exactly
+const OFFICIAL_PRICING = {
+  MTN: {
+    1: 4.20, 2: 8.80, 3: 12.80, 4: 17.80, 5: 22.30, 6: 25.00,
+    8: 33.00, 10: 41.00, 15: 59.50, 20: 79.00, 25: 99.00,
+    30: 121.00, 40: 158.00, 50: 200.00
+  },
+  AT: {
+    1: 3.95, 2: 8.35, 3: 13.25, 4: 16.50, 5: 19.50, 6: 23.50,
+    8: 30.50, 10: 38.50, 12: 45.50, 15: 57.50, 25: 95.00,
+    30: 115.00, 40: 151.00, 50: 190.00
+  },
+  TELECEL: {
+    5: 19.50, 8: 34.64, 10: 37.50, 12: 43.70, 15: 54.85,
+    20: 73.80, 25: 90.75, 30: 107.70, 35: 130.65, 40: 142.60,
+    45: 154.55, 50: 177.50, 100: 397.00
+  }
+};
+
 const DEFAULT_PRODUCTS = {
   MTN: [
-    { capacity: 1, capacityUnit: 'GB', validity: '30 days', basePrice: 4.5, sellingPrice: 5 },
-    { capacity: 2, capacityUnit: 'GB', validity: '30 days', basePrice: 9, sellingPrice: 10 },
-    { capacity: 3, capacityUnit: 'GB', validity: '30 days', basePrice: 13.5, sellingPrice: 15 },
-    { capacity: 5, capacityUnit: 'GB', validity: '30 days', basePrice: 22.5, sellingPrice: 25 },
-    { capacity: 10, capacityUnit: 'GB', validity: '30 days', basePrice: 45, sellingPrice: 50 },
+    { capacity: 1, capacityUnit: 'GB', validity: '30 days', basePrice: 4.20, sellingPrice: 5.00 },
+    { capacity: 2, capacityUnit: 'GB', validity: '30 days', basePrice: 8.80, sellingPrice: 10.00 },
+    { capacity: 3, capacityUnit: 'GB', validity: '30 days', basePrice: 12.80, sellingPrice: 15.00 },
+    { capacity: 5, capacityUnit: 'GB', validity: '30 days', basePrice: 22.30, sellingPrice: 25.00 },
+    { capacity: 10, capacityUnit: 'GB', validity: '30 days', basePrice: 41.00, sellingPrice: 46.00 },
+    { capacity: 15, capacityUnit: 'GB', validity: '30 days', basePrice: 59.50, sellingPrice: 66.00 },
+    { capacity: 20, capacityUnit: 'GB', validity: '30 days', basePrice: 79.00, sellingPrice: 88.00 },
   ],
   TELECEL: [
-    { capacity: 1, capacityUnit: 'GB', validity: '30 days', basePrice: 3.5, sellingPrice: 4 },
-    { capacity: 2, capacityUnit: 'GB', validity: '30 days', basePrice: 7, sellingPrice: 8 },
-    { capacity: 5, capacityUnit: 'GB', validity: '30 days', basePrice: 15, sellingPrice: 17 },
-    { capacity: 10, capacityUnit: 'GB', validity: '30 days', basePrice: 28, sellingPrice: 32 },
+    { capacity: 5, capacityUnit: 'GB', validity: '30 days', basePrice: 19.50, sellingPrice: 22.00 },
+    { capacity: 10, capacityUnit: 'GB', validity: '30 days', basePrice: 37.50, sellingPrice: 42.00 },
+    { capacity: 15, capacityUnit: 'GB', validity: '30 days', basePrice: 54.85, sellingPrice: 61.00 },
+    { capacity: 20, capacityUnit: 'GB', validity: '30 days', basePrice: 73.80, sellingPrice: 82.00 },
+    { capacity: 30, capacityUnit: 'GB', validity: '30 days', basePrice: 107.70, sellingPrice: 120.00 },
+    { capacity: 50, capacityUnit: 'GB', validity: '30 days', basePrice: 177.50, sellingPrice: 197.00 },
   ],
   AT: [
-    { capacity: 1, capacityUnit: 'GB', validity: '30 days', basePrice: 4, sellingPrice: 4.5 },
-    { capacity: 2, capacityUnit: 'GB', validity: '30 days', basePrice: 8, sellingPrice: 9 },
-    { capacity: 5, capacityUnit: 'GB', validity: '30 days', basePrice: 20, sellingPrice: 23 },
-    { capacity: 10, capacityUnit: 'GB', validity: '30 days', basePrice: 38, sellingPrice: 43 },
+    { capacity: 1, capacityUnit: 'GB', validity: '30 days', basePrice: 3.95, sellingPrice: 5.00 },
+    { capacity: 2, capacityUnit: 'GB', validity: '30 days', basePrice: 8.35, sellingPrice: 10.00 },
+    { capacity: 5, capacityUnit: 'GB', validity: '30 days', basePrice: 19.50, sellingPrice: 22.00 },
+    { capacity: 10, capacityUnit: 'GB', validity: '30 days', basePrice: 38.50, sellingPrice: 43.00 },
+    { capacity: 15, capacityUnit: 'GB', validity: '30 days', basePrice: 57.50, sellingPrice: 64.00 },
+    { capacity: 25, capacityUnit: 'GB', validity: '30 days', basePrice: 95.00, sellingPrice: 106.00 },
   ]
 };
 

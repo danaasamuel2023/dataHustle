@@ -22,6 +22,29 @@ const API_BASE = 'https://datahustle.onrender.com/api/v1';
 const NETWORKS = ['MTN', 'TELECEL', 'AT'];
 const CAPACITY_UNITS = ['MB', 'GB'];
 
+// Must match backend OFFICIAL_PRICING exactly
+const OFFICIAL_PRICING = {
+  MTN: {
+    1: 4.20, 2: 8.80, 3: 12.80, 4: 17.80, 5: 22.30, 6: 25.00,
+    8: 33.00, 10: 41.00, 15: 59.50, 20: 79.00, 25: 99.00,
+    30: 121.00, 40: 158.00, 50: 200.00
+  },
+  AT: {
+    1: 3.95, 2: 8.35, 3: 13.25, 4: 16.50, 5: 19.50, 6: 23.50,
+    8: 30.50, 10: 38.50, 12: 45.50, 15: 57.50, 25: 95.00,
+    30: 115.00, 40: 151.00, 50: 190.00
+  },
+  TELECEL: {
+    5: 19.50, 8: 34.64, 10: 37.50, 12: 43.70, 15: 54.85,
+    20: 73.80, 25: 90.75, 30: 107.70, 35: 130.65, 40: 142.60,
+    45: 154.55, 50: 177.50, 100: 397.00
+  }
+};
+
+const getBasePrice = (network, capacity) => {
+  return OFFICIAL_PRICING[network]?.[capacity] || null;
+};
+
 export default function ProductsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -153,13 +176,27 @@ export default function ProductsPage() {
     setError('');
 
     try {
+      const capacity = parseFloat(formData.capacity);
+      const basePrice = getBasePrice(formData.network, capacity);
+
+      if (!basePrice) {
+        setError(`Invalid capacity for ${formData.network}. Available: ${Object.keys(OFFICIAL_PRICING[formData.network] || {}).join(', ')}GB`);
+        setSaving(false);
+        return;
+      }
+
+      if (parseFloat(formData.sellingPrice) < basePrice) {
+        setError(`Selling price must be at least GH₵${basePrice.toFixed(2)} (base cost)`);
+        setSaving(false);
+        return;
+      }
+
       const payload = {
         name: formData.name || `${formData.network} ${formData.capacity}${formData.capacityUnit}`,
         network: formData.network,
-        capacity: parseFloat(formData.capacity),
+        capacity,
         capacityUnit: formData.capacityUnit,
         validity: formData.validity,
-        basePrice: parseFloat(formData.basePrice),
         sellingPrice: parseFloat(formData.sellingPrice),
         isActive: formData.isActive,
         productType: 'data'
@@ -436,7 +473,7 @@ export default function ProductsPage() {
                 </label>
                 <select
                   value={formData.network}
-                  onChange={(e) => setFormData({ ...formData, network: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, network: e.target.value, capacity: '', basePrice: '' })}
                   className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white"
                 >
                   {NETWORKS.map(network => (
@@ -445,36 +482,25 @@ export default function ProductsPage() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Capacity *
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.capacity}
-                    onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
-                    placeholder="e.g., 5"
-                    required
-                    min="0"
-                    step="0.1"
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Unit *
-                  </label>
-                  <select
-                    value={formData.capacityUnit}
-                    onChange={(e) => setFormData({ ...formData, capacityUnit: e.target.value })}
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white"
-                  >
-                    {CAPACITY_UNITS.map(unit => (
-                      <option key={unit} value={unit}>{unit}</option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Capacity (GB) *
+                </label>
+                <select
+                  value={formData.capacity}
+                  onChange={(e) => {
+                    const cap = e.target.value;
+                    const base = getBasePrice(formData.network, parseFloat(cap));
+                    setFormData({ ...formData, capacity: cap, capacityUnit: 'GB', basePrice: base ? base.toFixed(2) : '' });
+                  }}
+                  required
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white"
+                >
+                  <option value="">Select capacity</option>
+                  {Object.keys(OFFICIAL_PRICING[formData.network] || {}).map(cap => (
+                    <option key={cap} value={cap}>{cap}GB — Base: GH₵{OFFICIAL_PRICING[formData.network][cap].toFixed(2)}</option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -507,22 +533,19 @@ export default function ProductsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Your Cost (GH₵) *
+                    Base Cost (GH₵)
                   </label>
                   <input
-                    type="number"
-                    value={formData.basePrice}
-                    onChange={(e) => setFormData({ ...formData, basePrice: e.target.value })}
-                    placeholder="0.00"
-                    required
-                    min="0"
-                    step="0.01"
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white"
+                    type="text"
+                    value={formData.basePrice ? `GH₵${parseFloat(formData.basePrice).toFixed(2)}` : 'Select capacity'}
+                    readOnly
+                    className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-600 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400 cursor-not-allowed"
                   />
+                  <p className="text-xs text-gray-500 mt-1">Set by platform</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Selling Price (GH₵) *
+                    Your Selling Price (GH₵) *
                   </label>
                   <input
                     type="number"
@@ -530,17 +553,27 @@ export default function ProductsPage() {
                     onChange={(e) => setFormData({ ...formData, sellingPrice: e.target.value })}
                     placeholder="0.00"
                     required
-                    min="0"
+                    min={formData.basePrice || 0}
                     step="0.01"
                     className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white"
                   />
+                  {formData.basePrice && (
+                    <p className="text-xs text-gray-500 mt-1">Min: GH₵{parseFloat(formData.basePrice).toFixed(2)}</p>
+                  )}
                 </div>
               </div>
 
-              {formData.basePrice && formData.sellingPrice && (
+              {formData.basePrice && formData.sellingPrice && parseFloat(formData.sellingPrice) >= parseFloat(formData.basePrice) && (
                 <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                   <p className="text-sm text-green-700 dark:text-green-400">
                     Profit per sale: <span className="font-semibold">GH₵{(parseFloat(formData.sellingPrice) - parseFloat(formData.basePrice)).toFixed(2)}</span>
+                  </p>
+                </div>
+              )}
+              {formData.basePrice && formData.sellingPrice && parseFloat(formData.sellingPrice) < parseFloat(formData.basePrice) && (
+                <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                  <p className="text-sm text-red-700 dark:text-red-400">
+                    Selling price must be at least GH₵{parseFloat(formData.basePrice).toFixed(2)}
                   </p>
                 </div>
               )}
