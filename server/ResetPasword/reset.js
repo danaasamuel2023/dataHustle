@@ -5,7 +5,7 @@ const rateLimit = require('express-rate-limit');
 const { User } = require('../schema/schema');
 const bcrypt = require("bcryptjs");
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || 'DatAmArt';
 
 // Rate limiter for password reset (prevents OTP brute force + SMS spam)
 const resetLimiter = rateLimit({

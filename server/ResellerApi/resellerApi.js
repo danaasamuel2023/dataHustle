@@ -17,7 +17,7 @@ const {
 } = require('../schema/schema');
 
 // Constants
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || 'DatAmArt';
 
 const GEONETTECH_BASE_URL = 'https://posapi.geonettech.com/api/v1';
 const GEONETTECH_API_KEY = process.env.GEONETTECH_API_KEY;

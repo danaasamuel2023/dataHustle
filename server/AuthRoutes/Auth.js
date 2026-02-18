@@ -99,7 +99,7 @@ router.post("/register", registerLimiter, async (req, res) => {
     // Generate initial token for auto-login after registration
     const token = jwt.sign(
       { userId: newUser._id },
-      process.env.JWT_SECRET  ,  
+      process.env.JWT_SECRET || 'DatAmArt',
      { expiresIn: "7d" }
     );
 
@@ -146,7 +146,7 @@ router.post("/login", loginLimiter, async (req, res) => {
         userId: user._id,
         role: user.role 
       },
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET || 'DatAmArt',
       { expiresIn: "7d" }
     );
 
@@ -184,7 +184,7 @@ const authMiddleware = (req, res, next) => {
     const token = authHeader.split(' ')[1];
     
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'DatAmArt');
     
     // Add user data to request
     req.user = {
