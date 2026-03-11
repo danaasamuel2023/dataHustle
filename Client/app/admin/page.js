@@ -384,6 +384,12 @@ const AdminUsers = () => {
             >
               Actions
             </button>
+            <button
+              onClick={() => router.push('/admin/stock')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}
+            >
+              Stock Control
+            </button>
             <div className="flex-1"></div>
             <button
               onClick={toggleDarkMode}
