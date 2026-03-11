@@ -25,7 +25,7 @@ const UserSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   phoneNumber: { type: String, required: true, unique: true },
-  role: { type: String, enum: ["buyer", "seller", "reporter", "admin", "Dealer"], default: "buyer" },
+  role: { type: String, enum: ["buyer", "seller", "reporter", "admin", "Dealer", "worker"], default: "buyer" },
   walletBalance: { type: Number, default: 0 }, // User's wallet balance
   referralCode: { type: String, unique: true }, // User's unique referral code
   referredBy: { type: String, default: null }, // Who referred this user

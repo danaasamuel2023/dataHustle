@@ -32,6 +32,9 @@ const withdrawalRoutes = require('./storeRoutes/withdrawalRoutes.js');
 const adminStoreRoutes = require('./storeRoutes/adminStoreRoutes.js');
 const settingsRoutes = require('./storeRoutes/settingsRoutes.js');
 
+// Support Team Routes
+const supportRoutes = require('./supportRoutes/support.js');
+
 // Initialize Express app
 const app = express();
 
@@ -72,6 +75,9 @@ app.use('/api/v1/agent-store', storeRoutes);
 app.use('/api/v1/agent-store', withdrawalRoutes);
 app.use('/api/v1/admin/agent-stores', adminStoreRoutes);
 app.use('/api/v1/settings', settingsRoutes);
+
+// Support Team Routes
+app.use('/api/support', supportRoutes);
 
 // Default Route
 app.get('/', (req, res) => {
