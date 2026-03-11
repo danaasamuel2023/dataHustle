@@ -238,7 +238,16 @@ router.get('/stores/:storeSlugOrId/products', async (req, res) => {
       return res.status(404).json({ status: 'error', message: 'Store not found' });
     }
 
-    const products = await AgentProduct.find({ storeId: store._id, isActive: true, inStock: true })
+    // Check global inventory — filter out networks that are out of stock globally
+    const outOfStockNetworks = await DataInventory.find({ inStock: false }).select('network');
+    const blockedNetworks = outOfStockNetworks.map(i => i.network);
+
+    const productFilter = { storeId: store._id, isActive: true, inStock: true };
+    if (blockedNetworks.length > 0) {
+      productFilter.network = { $nin: blockedNetworks };
+    }
+
+    const products = await AgentProduct.find(productFilter)
       .select('name description network capacity capacityUnit validity sellingPrice inStock')
       .sort({ network: 1, capacity: 1 });
 
@@ -268,6 +277,12 @@ router.post('/stores/:storeSlug/purchase/initialize', async (req, res) => {
     const product = await AgentProduct.findOne({ _id: productId, storeId: store._id, isActive: true, inStock: true });
     if (!product) {
       return res.status(404).json({ status: 'error', message: 'Product not found or out of stock' });
+    }
+
+    // Check global inventory for this network
+    const globalInventory = await DataInventory.findOne({ network: product.network });
+    if (globalInventory && !globalInventory.inStock) {
+      return res.status(400).json({ status: 'error', message: `${product.network} data bundles are currently out of stock. Please try again later.` });
     }
 
     // Generate transaction ID
