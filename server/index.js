@@ -79,6 +79,10 @@ app.use('/api/v1/settings', settingsRoutes);
 // Support Team Routes
 app.use('/api/support', supportRoutes);
 
+// DataMart Webhook (order status updates)
+const datamartWebhook = require('./webhooks/datamartWebhook');
+app.use('/api/webhook', datamartWebhook);
+
 // Default Route
 app.get('/', (req, res) => {
   res.send('API is running...');
