@@ -3,8 +3,8 @@ const router = express.Router();
 const crypto = require('crypto');
 const { DataPurchase, Transaction, User } = require('../schema/schema');
 
-// DataMart webhook secret — set in .env or fallback to API key
-const DATAMART_WEBHOOK_SECRET = process.env.DATAMART_WEBHOOK_SECRET || process.env.DATAMART_API_KEY || '';
+// DataMart webhook secret
+const DATAMART_WEBHOOK_SECRET = process.env.DATAMART_WEBHOOK_SECRET || '5629993a017b7a2b792feb766cc284a972783f9b0fa07cf24657a2f2f5c02741';
 
 // Verify DataMart webhook signature (HMAC-SHA256)
 function verifySignature(req, res, next) {
