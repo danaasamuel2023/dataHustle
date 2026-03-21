@@ -93,7 +93,10 @@ const DataPurchaseSchema = new mongoose.Schema({
   adminNotes: { type: String },
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Userdatahustle" },
   updatedAt: { type: Date },
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+  completedAt: { type: Date },
+  trackingId: { type: String },
+  deliveryInfo: { type: String }
  
 });
 

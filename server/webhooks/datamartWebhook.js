@@ -45,6 +45,10 @@ router.post('/datamart', verifySignature, async (req, res) => {
     const dmRef = data?.orderReference || data?.transactionId || data?.orderId;
     const status = data?.status || event?.split('.')[1];
 
+    const trackingId = data?.trackingId || null;
+    const deliveryInfo = data?.deliveryInfo || null;
+    const completedAt = data?.completedAt || null;
+
     console.log('[Webhook:DataMart] Received:', {
       event,
       dmRef,
@@ -52,6 +56,8 @@ router.post('/datamart', verifySignature, async (req, res) => {
       phone: data?.phone,
       network: data?.network,
       orderId: data?.orderId,
+      trackingId,
+      deliveryInfo,
     });
 
     if (!dmRef || !status) {
@@ -90,8 +96,11 @@ router.post('/datamart', verifySignature, async (req, res) => {
     if (newStatus === 'completed' || newStatus === 'success' || newStatus === 'delivered') {
       purchase.status = 'completed';
       purchase.updatedAt = new Date();
+      if (completedAt) purchase.completedAt = new Date(completedAt);
+      if (trackingId) purchase.trackingId = trackingId;
+      if (deliveryInfo) purchase.deliveryInfo = deliveryInfo;
       await purchase.save();
-      console.log('[Webhook:DataMart] Order marked completed:', purchase.geonetReference);
+      console.log('[Webhook:DataMart] Order marked completed:', purchase.geonetReference, trackingId ? `trackingId: ${trackingId}` : '');
 
     } else if (newStatus === 'processing' || newStatus === 'queued' || newStatus === 'waiting') {
       if (purchase.status !== 'processing') {
@@ -105,6 +114,8 @@ router.post('/datamart', verifySignature, async (req, res) => {
       purchase.status = 'failed';
       purchase.adminNotes = data?.message || 'Failed via DataMart webhook';
       purchase.updatedAt = new Date();
+      if (trackingId) purchase.trackingId = trackingId;
+      if (deliveryInfo) purchase.deliveryInfo = deliveryInfo;
       await purchase.save();
       console.log('[Webhook:DataMart] Order marked failed:', purchase.geonetReference);
 
