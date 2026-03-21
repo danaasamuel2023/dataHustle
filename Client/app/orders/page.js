@@ -1,17 +1,13 @@
 'use client'
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  Loader2, Phone, Database, Clock, Search, Filter, X, 
-  Activity, TrendingUp, RefreshCw, CheckCircle, 
+import {
+  Loader2, Phone, Database, Clock, Search, Filter, X,
+  Activity, TrendingUp, CheckCircle,
   AlertCircle, Calendar, Copy, Check
 } from 'lucide-react';
 
 const API_BASE_URL = 'https://datahustle.onrender.com/api/v1';
-const GEONETTECH_BASE_URL = 'https://testhub.geonettech.site/api/v1/checkOrderStatus/:ref';
-const API_KEY = '42|tjhxBxaWWe4mPUpxXN1uIk0KTxypvlSqOIOQWz6K162aa0d6';
-const TELCEL_API_URL = 'https://iget.onrender.com/api/developer/orders/reference/:orderRef';
-const TELCEL_API_KEY = '4cb6763274e86173d2c22c120493ca67b6185039f826f4aa43bb3057db50f858';
 
 const formatMoney = (amount) => {
   return new Intl.NumberFormat('en-GH', {
@@ -38,7 +34,6 @@ export default function DataPurchases() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterNetwork, setFilterNetwork] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
-  const [checkingStatus, setCheckingStatus] = useState({});
   const [copiedRef, setCopiedRef] = useState(null);
   const [selectedPurchase, setSelectedPurchase] = useState(null);
 
@@ -56,59 +51,6 @@ export default function DataPurchases() {
     } catch (err) {
       console.error('Error parsing user data:', err);
       return null;
-    }
-  };
-
-  const checkOrderStatus = useCallback(async (purchase) => {
-    if (!purchase.geonetReference || purchase.network === 'at') {
-      return purchase;
-    }
-    
-    try {
-      let statusRes;
-      let status;
-      
-      if (purchase.network === 'TELECEL') {
-        const telcelUrl = TELCEL_API_URL.replace(':orderRef', purchase.geonetReference);
-        statusRes = await fetch(telcelUrl, {
-          headers: { 'X-API-Key': TELCEL_API_KEY }
-        });
-        const data = await statusRes.json();
-        status = data.data.order.status;
-      } else {
-        const url = GEONETTECH_BASE_URL.replace(':ref', purchase.geonetReference);
-        statusRes = await fetch(url, {
-          headers: { Authorization: `Bearer ${API_KEY}` }
-        });
-        const data = await statusRes.json();
-        status = data.data.status;
-      }
-      
-      if (status && status !== purchase.status) {
-        return { ...purchase, status, lastChecked: new Date().toISOString() };
-      }
-      
-      return { ...purchase, lastChecked: new Date().toISOString() };
-    } catch (error) {
-      console.error(`Failed to fetch status for purchase ${purchase._id}:`, error);
-      return purchase;
-    }
-  }, []);
-
-  const manualCheckStatus = async (purchaseId) => {
-    const purchase = allPurchases.find(p => p._id === purchaseId);
-    if (!purchase) return;
-    
-    setCheckingStatus(prev => ({ ...prev, [purchaseId]: true }));
-    
-    try {
-      const updated = await checkOrderStatus(purchase);
-      
-      setAllPurchases(prev => prev.map(p => 
-        p._id === purchaseId ? updated : p
-      ));
-    } finally {
-      setCheckingStatus(prev => ({ ...prev, [purchaseId]: false }));
     }
   };
 
@@ -503,29 +445,12 @@ export default function DataPurchases() {
                         )}
                       </div>
 
-                      {/* Delivery info + Check button */}
-                      <div className="flex items-center justify-between mt-2 gap-2">
-                        {purchase.deliveryInfo && purchase.status === 'completed' ? (
-                          <div className="flex-1 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50 rounded-lg px-3 py-1.5">
-                            <p className="text-xs font-medium text-green-700 dark:text-green-400 whitespace-pre-line">{purchase.deliveryInfo}</p>
-                          </div>
-                        ) : (
-                          <div />
-                        )}
-                        {purchase.geonetReference && purchase.network !== 'at' && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              manualCheckStatus(purchase._id);
-                            }}
-                            disabled={checkingStatus[purchase._id]}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 flex-shrink-0"
-                          >
-                            <RefreshCw className={`w-3.5 h-3.5 ${checkingStatus[purchase._id] ? 'animate-spin' : ''}`} />
-                            <span>{checkingStatus[purchase._id] ? 'Checking...' : 'Check Status'}</span>
-                          </button>
-                        )}
-                      </div>
+                      {/* Delivery info */}
+                      {purchase.deliveryInfo && purchase.status === 'completed' && (
+                        <div className="mt-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50 rounded-lg px-3 py-1.5">
+                          <p className="text-xs font-medium text-green-700 dark:text-green-400 whitespace-pre-line">{purchase.deliveryInfo}</p>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
