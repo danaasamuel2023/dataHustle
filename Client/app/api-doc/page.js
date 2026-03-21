@@ -89,6 +89,7 @@ const DataMartDocumentation = () => {
                 <li><a href="#authentication" className="text-blue-600 hover:underline">Authentication</a></li>
                 <li><a href="#purchase-endpoint" className="text-blue-600 hover:underline">Purchase Data</a></li>
                 <li><a href="#data-packages" className="text-blue-600 hover:underline">Data Packages</a></li>
+                <li><a href="#webhooks" className="text-blue-600 hover:underline">Webhooks</a></li>
                 <li><a href="#additional-endpoints" className="text-blue-600 hover:underline">Additional Endpoints</a></li>
                 <li><a href="#api-simulator" className="text-blue-600 hover:underline">API Simulator</a></li>
                 <li><a href="#code-samples" className="text-blue-600 hover:underline">Code Samples</a></li>
@@ -270,6 +271,133 @@ const DataMartDocumentation = () => {
   }
 }`}
               </pre>
+            </div>
+          </div>
+
+          {/* Webhooks */}
+          <div className="mb-8" id="webhooks">
+            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+              <FaNetworkWired className="mr-2" /> Webhooks
+            </h2>
+            <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
+              <p className="mb-4">
+                DataHustle uses webhooks to notify your system in real-time when an order status changes.
+                You do not need to poll for status updates — we will send the update to your configured webhook URL automatically.
+              </p>
+
+              <div className="bg-green-50 border-l-4 border-green-500 p-3 mb-6">
+                <p className="text-green-800">
+                  <strong>How it works:</strong> When you place an order, the status starts as <code className="bg-green-200 px-1 rounded">pending</code>.
+                  As the order progresses, we send webhook events to your URL for each status change:
+                  <code className="bg-green-200 px-1 rounded">processing</code> → <code className="bg-green-200 px-1 rounded">completed</code> or <code className="bg-green-200 px-1 rounded">failed</code>.
+                  Failed orders are automatically refunded to your wallet.
+                </p>
+              </div>
+
+              <h3 className="font-semibold text-gray-800">Webhook Events:</h3>
+              <ul className="list-disc pl-5 mt-2 space-y-1 mb-4">
+                <li><code className="bg-gray-200 px-1 rounded">order.created</code> — Order has been placed and is pending</li>
+                <li><code className="bg-gray-200 px-1 rounded">order.processing</code> — Order is being processed</li>
+                <li><code className="bg-gray-200 px-1 rounded">order.completed</code> — Data has been delivered successfully</li>
+                <li><code className="bg-gray-200 px-1 rounded">order.failed</code> — Order failed (wallet auto-refunded)</li>
+                <li><code className="bg-gray-200 px-1 rounded">order.refunded</code> — Order was refunded</li>
+              </ul>
+
+              <h3 className="font-semibold text-gray-800">Webhook Payload:</h3>
+              <p className="mt-2 mb-2">Each webhook sends a JSON payload with the following structure:</p>
+              <pre className="bg-gray-800 text-green-400 p-3 rounded mt-2 overflow-x-auto">
+{`{
+  "event": "order.completed",
+  "timestamp": "2026-03-21T15:38:00.000Z",
+  "data": {
+    "orderId": "60f1e5b3e6b39812345678",
+    "orderReference": "DM-RM7520GP",
+    "transactionId": "TRX-a1b2c3d4-...",
+    "phone": "0551234567",
+    "network": "YELLO",
+    "capacity": 1,
+    "price": 4.20,
+    "status": "completed",
+    "trackingId": "98765",
+    "deliveryInfo": "Submitted to Yello server\\n21 Mar 2026, 03:38 pm",
+    "completedAt": "2026-03-21T15:38:00.000Z",
+    "createdAt": "2026-03-21T15:35:00.000Z",
+    "updatedAt": "2026-03-21T15:38:00.000Z"
+  }
+}`}
+              </pre>
+
+              <h3 className="font-semibold mt-6 text-gray-800">Webhook Fields:</h3>
+              <div className="mt-2 overflow-x-auto">
+                <table className="w-full text-sm border border-gray-300">
+                  <thead className="bg-gray-200">
+                    <tr>
+                      <th className="text-left px-3 py-2 border-b">Field</th>
+                      <th className="text-left px-3 py-2 border-b">Type</th>
+                      <th className="text-left px-3 py-2 border-b">Description</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b"><td className="px-3 py-2 font-mono">event</td><td className="px-3 py-2">string</td><td className="px-3 py-2">The event type (e.g. order.completed)</td></tr>
+                    <tr className="border-b"><td className="px-3 py-2 font-mono">data.orderId</td><td className="px-3 py-2">string</td><td className="px-3 py-2">Unique order ID</td></tr>
+                    <tr className="border-b"><td className="px-3 py-2 font-mono">data.orderReference</td><td className="px-3 py-2">string</td><td className="px-3 py-2">Your order reference code</td></tr>
+                    <tr className="border-b"><td className="px-3 py-2 font-mono">data.phone</td><td className="px-3 py-2">string</td><td className="px-3 py-2">Recipient phone number</td></tr>
+                    <tr className="border-b"><td className="px-3 py-2 font-mono">data.network</td><td className="px-3 py-2">string</td><td className="px-3 py-2">Network (YELLO, TELECEL, AT_PREMIUM)</td></tr>
+                    <tr className="border-b"><td className="px-3 py-2 font-mono">data.capacity</td><td className="px-3 py-2">number</td><td className="px-3 py-2">Data size in GB</td></tr>
+                    <tr className="border-b"><td className="px-3 py-2 font-mono">data.price</td><td className="px-3 py-2">number</td><td className="px-3 py-2">Amount charged (GHS)</td></tr>
+                    <tr className="border-b"><td className="px-3 py-2 font-mono">data.status</td><td className="px-3 py-2">string</td><td className="px-3 py-2">Current order status</td></tr>
+                    <tr className="border-b"><td className="px-3 py-2 font-mono">data.trackingId</td><td className="px-3 py-2">string</td><td className="px-3 py-2">Delivery tracking ID (available on completion)</td></tr>
+                    <tr className="border-b"><td className="px-3 py-2 font-mono">data.deliveryInfo</td><td className="px-3 py-2">string</td><td className="px-3 py-2">Delivery confirmation message with timestamp</td></tr>
+                    <tr className="border-b"><td className="px-3 py-2 font-mono">data.completedAt</td><td className="px-3 py-2">string</td><td className="px-3 py-2">ISO timestamp of when delivery completed</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <h3 className="font-semibold mt-6 text-gray-800">Verifying Webhook Signatures:</h3>
+              <p className="mt-2 mb-2">Each webhook includes an <code className="bg-gray-200 px-1 rounded">X-DataMart-Signature</code> header containing an HMAC-SHA256 signature.
+              Verify it using your webhook secret to ensure the request is authentic:</p>
+              <pre className="bg-gray-800 text-white p-3 rounded mt-2 overflow-x-auto">
+{`const crypto = require('crypto');
+
+function verifyWebhook(req, webhookSecret) {
+  const signature = req.headers['x-datamart-signature'];
+  const expected = crypto
+    .createHmac('sha256', webhookSecret)
+    .update(JSON.stringify(req.body))
+    .digest('hex');
+
+  return signature === expected;
+}
+
+// Express webhook handler
+app.post('/webhook/datamart', (req, res) => {
+  if (!verifyWebhook(req, process.env.WEBHOOK_SECRET)) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+
+  const { event, data } = req.body;
+
+  if (event === 'order.completed') {
+    console.log('Order delivered!', data.orderReference);
+    console.log('Tracking ID:', data.trackingId);
+    console.log('Delivery:', data.deliveryInfo);
+    // Update your database...
+  } else if (event === 'order.failed') {
+    console.log('Order failed:', data.orderReference);
+    // Wallet has been auto-refunded
+  }
+
+  res.json({ status: 'success' });
+});`}
+              </pre>
+
+              <div className="bg-yellow-50 border-l-4 border-yellow-500 p-3 mt-4">
+                <p className="text-yellow-800">
+                  <strong>Important:</strong> Always verify the webhook signature before processing.
+                  Your webhook endpoint should respond with a <code className="bg-yellow-200 px-1 rounded">200</code> status within 10 seconds,
+                  otherwise the delivery will be marked as failed. After 10 consecutive failures, your webhook will be automatically disabled.
+                </p>
+              </div>
             </div>
           </div>
 
