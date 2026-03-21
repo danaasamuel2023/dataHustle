@@ -445,83 +445,87 @@ export default function DataPurchases() {
                   return (
                     <div
                       key={purchase._id}
-                      onClick={() => setSelectedPurchase(purchase)}
-                      className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                      className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 border border-gray-100 dark:border-gray-600/50"
                     >
-                      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h3 className="font-semibold text-gray-900 dark:text-white">
-                              {formatDataSize(purchase.capacity)} Data
-                            </h3>
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium ${statusInfo.color}`}>
-                              {statusInfo.icon}
-                              <span className="ml-1">{statusInfo.text}</span>
-                            </span>
-                          </div>
-                          
-                          <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
-                            <div className="flex items-center gap-1">
-                              <Phone className="w-4 h-4" />
-                              <span>{purchase.phoneNumber}</span>
-                            </div>
-                            
-                            <div className="flex items-center gap-1">
-                              <Activity className="w-4 h-4" />
-                              <span>{networkNames[purchase.network] || purchase.network}</span>
-                            </div>
-                            
-                            <div className="flex items-center gap-1">
-                              <Calendar className="w-4 h-4" />
-                              <span>{formatDate(purchase.createdAt)}</span>
-                            </div>
-                            
-                            {purchase.geonetReference && (
-                              <div className="flex items-center gap-1">
-                                <code className="text-xs bg-gray-200 dark:bg-gray-600 px-2 py-1 rounded">{purchase.geonetReference}</code>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    copyToClipboard(purchase.geonetReference, purchase._id);
-                                  }}
-                                  className="hover:text-yellow-600 transition-colors"
-                                >
-                                  {copiedRef === purchase._id ? (
-                                    <Check className="w-3 h-3 text-green-600" />
-                                  ) : (
-                                    <Copy className="w-3 h-3" />
-                                  )}
-                                </button>
-                              </div>
-                            )}
-                          </div>
+                      {/* Top row: Bundle + Status + Price */}
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-bold text-gray-900 dark:text-white">
+                            {formatDataSize(purchase.capacity)}
+                          </h3>
+                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-600 px-2 py-0.5 rounded">
+                            {networkNames[purchase.network] || purchase.network}
+                          </span>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium ${statusInfo.color}`}>
+                            {statusInfo.icon}
+                            <span className="ml-1">{statusInfo.text}</span>
+                          </span>
                         </div>
-                        
-                        <div className="flex items-center gap-3">
-                          <div className="text-right">
-                            <p className="text-lg font-semibold text-gray-900 dark:text-white">{formatMoney(purchase.price)}</p>
-                          </div>
-                          
-                          {purchase.geonetReference && purchase.network !== 'at' && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                manualCheckStatus(purchase._id);
-                              }}
-                              disabled={checkingStatus[purchase._id]}
-                              className="flex items-center gap-1 px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                            >
-                              <RefreshCw className={`w-4 h-4 ${checkingStatus[purchase._id] ? 'animate-spin' : ''}`} />
-                              <span className="hidden sm:inline">{checkingStatus[purchase._id] ? 'Checking...' : 'Check'}</span>
-                            </button>
-                          )}
-                        </div>
+                        <p className="text-lg font-bold text-gray-900 dark:text-white">{formatMoney(purchase.price)}</p>
                       </div>
-                      {purchase.deliveryInfo && purchase.status === 'completed' && (
-                        <div className="mt-2 px-3 py-1.5 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                          <p className="text-xs text-green-700 dark:text-green-400 whitespace-pre-line">{purchase.deliveryInfo}</p>
+
+                      {/* Details grid */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                        <div className="bg-white dark:bg-gray-800 rounded-lg px-3 py-2">
+                          <p className="text-gray-400 dark:text-gray-500 mb-0.5">Phone</p>
+                          <p className="font-semibold text-gray-900 dark:text-white">{purchase.phoneNumber}</p>
                         </div>
-                      )}
+                        <div className="bg-white dark:bg-gray-800 rounded-lg px-3 py-2">
+                          <p className="text-gray-400 dark:text-gray-500 mb-0.5">Date</p>
+                          <p className="font-medium text-gray-900 dark:text-white">{formatDate(purchase.createdAt)}</p>
+                        </div>
+                        {purchase.geonetReference && (
+                          <div className="bg-white dark:bg-gray-800 rounded-lg px-3 py-2">
+                            <p className="text-gray-400 dark:text-gray-500 mb-0.5">Reference</p>
+                            <div className="flex items-center gap-1">
+                              <code className="font-mono font-medium text-gray-900 dark:text-white truncate">{purchase.geonetReference}</code>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  copyToClipboard(purchase.geonetReference, purchase._id);
+                                }}
+                                className="hover:text-yellow-600 transition-colors flex-shrink-0"
+                              >
+                                {copiedRef === purchase._id ? (
+                                  <Check className="w-3 h-3 text-green-600" />
+                                ) : (
+                                  <Copy className="w-3 h-3" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {purchase.trackingId && (
+                          <div className="bg-white dark:bg-gray-800 rounded-lg px-3 py-2">
+                            <p className="text-gray-400 dark:text-gray-500 mb-0.5">Tracking ID</p>
+                            <p className="font-mono font-medium text-gray-900 dark:text-white">{purchase.trackingId}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Delivery info + Check button */}
+                      <div className="flex items-center justify-between mt-2 gap-2">
+                        {purchase.deliveryInfo && purchase.status === 'completed' ? (
+                          <div className="flex-1 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50 rounded-lg px-3 py-1.5">
+                            <p className="text-xs font-medium text-green-700 dark:text-green-400 whitespace-pre-line">{purchase.deliveryInfo}</p>
+                          </div>
+                        ) : (
+                          <div />
+                        )}
+                        {purchase.geonetReference && purchase.network !== 'at' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              manualCheckStatus(purchase._id);
+                            }}
+                            disabled={checkingStatus[purchase._id]}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 flex-shrink-0"
+                          >
+                            <RefreshCw className={`w-3.5 h-3.5 ${checkingStatus[purchase._id] ? 'animate-spin' : ''}`} />
+                            <span>{checkingStatus[purchase._id] ? 'Checking...' : 'Check Status'}</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
