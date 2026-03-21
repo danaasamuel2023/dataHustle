@@ -517,6 +517,11 @@ export default function DataPurchases() {
                           )}
                         </div>
                       </div>
+                      {purchase.deliveryInfo && purchase.status === 'completed' && (
+                        <div className="mt-2 px-3 py-1.5 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                          <p className="text-xs text-green-700 dark:text-green-400 whitespace-pre-line">{purchase.deliveryInfo}</p>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -585,6 +590,20 @@ export default function DataPurchases() {
                       )}
                     </button>
                   </div>
+                </div>
+              )}
+
+              {selectedPurchase.trackingId && (
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Tracking ID</p>
+                  <p className="text-sm font-mono text-gray-900 dark:text-white">{selectedPurchase.trackingId}</p>
+                </div>
+              )}
+
+              {selectedPurchase.deliveryInfo && (
+                <div className="bg-green-50 dark:bg-green-900/30 rounded-lg p-3">
+                  <p className="text-xs text-green-600 dark:text-green-400 mb-1">Delivery Status</p>
+                  <p className="text-sm text-green-800 dark:text-green-300 whitespace-pre-line">{selectedPurchase.deliveryInfo}</p>
                 </div>
               )}
             </div>
