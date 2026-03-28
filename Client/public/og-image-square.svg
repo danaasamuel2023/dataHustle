@@ -1,0 +1,55 @@
+<svg width="600" height="600" viewBox="0 0 600 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="600" height="600" fill="#0F172A"/>
+
+  <!-- Subtle grid -->
+  <defs>
+    <pattern id="grid2" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1E293B" stroke-width="0.5"/>
+    </pattern>
+  </defs>
+  <rect width="600" height="600" fill="url(#grid2)"/>
+
+  <!-- Glow -->
+  <circle cx="300" cy="220" r="150" fill="#6366F1" opacity="0.08"/>
+
+  <!-- Logo icon large -->
+  <rect x="230" y="120" width="140" height="140" rx="32" fill="#6366F1"/>
+  <rect x="258" y="200" width="16" height="20" rx="4" fill="white" opacity="0.5"/>
+  <rect x="280" y="180" width="16" height="40" rx="4" fill="white" opacity="0.7"/>
+  <rect x="302" y="160" width="16" height="60" rx="4" fill="white" opacity="0.85"/>
+  <rect x="324" y="138" width="16" height="82" rx="4" fill="white"/>
+  <circle cx="332" cy="130" r="6" fill="white" opacity="0.6"/>
+
+  <!-- Brand -->
+  <text x="300" y="315" font-family="system-ui, -apple-system, sans-serif" font-size="48" font-weight="800" fill="white" text-anchor="middle" letter-spacing="-1">Data<tspan fill="#818CF8">Hustle</tspan></text>
+
+  <!-- Tagline -->
+  <text x="300" y="352" font-family="system-ui, sans-serif" font-size="17" fill="#94A3B8" text-anchor="middle">Ghana's Cheapest Data Bundles</text>
+
+  <!-- Price pills -->
+  <rect x="60" y="400" width="150" height="60" rx="10" fill="#1E293B" stroke="#334155" stroke-width="1"/>
+  <rect x="60" y="400" width="150" height="22" rx="10" fill="#FFCC00"/>
+  <rect x="60" y="412" width="150" height="10" fill="#FFCC00"/>
+  <text x="135" y="417" font-family="system-ui, sans-serif" font-size="11" font-weight="800" fill="#000" text-anchor="middle">MTN</text>
+  <text x="135" y="447" font-family="system-ui, sans-serif" font-size="16" font-weight="800" fill="white" text-anchor="middle">1GB · GH₵4.20</text>
+
+  <rect x="225" y="400" width="150" height="60" rx="10" fill="#1E293B" stroke="#334155" stroke-width="1"/>
+  <rect x="225" y="400" width="150" height="22" rx="10" fill="#E30613"/>
+  <rect x="225" y="412" width="150" height="10" fill="#E30613"/>
+  <text x="300" y="417" font-family="system-ui, sans-serif" font-size="11" font-weight="800" fill="white" text-anchor="middle">TELECEL</text>
+  <text x="300" y="447" font-family="system-ui, sans-serif" font-size="16" font-weight="800" fill="white" text-anchor="middle">5GB · GH₵19.50</text>
+
+  <rect x="390" y="400" width="150" height="60" rx="10" fill="#1E293B" stroke="#334155" stroke-width="1"/>
+  <rect x="390" y="400" width="150" height="22" rx="10" fill="#7C3AED"/>
+  <rect x="390" y="412" width="150" height="10" fill="#7C3AED"/>
+  <text x="465" y="417" font-family="system-ui, sans-serif" font-size="11" font-weight="800" fill="white" text-anchor="middle">AIRTELTIGO</text>
+  <text x="465" y="447" font-family="system-ui, sans-serif" font-size="16" font-weight="800" fill="white" text-anchor="middle">1GB · GH₵3.95</text>
+
+  <!-- CTA -->
+  <rect x="120" y="500" width="360" height="50" rx="10" fill="#6366F1"/>
+  <text x="300" y="532" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="white" text-anchor="middle">datahustle.shop</text>
+
+  <!-- Bottom -->
+  <text x="300" y="580" font-family="system-ui, sans-serif" font-size="12" fill="#475569" text-anchor="middle">No Expiry · Instant Delivery · MoMo Payment · 10,000+ Resellers</text>
+</svg>

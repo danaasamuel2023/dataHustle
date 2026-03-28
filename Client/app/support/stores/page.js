@@ -66,7 +66,7 @@ export default function AgentStores() {
                   <div>
                     <p className={`font-bold ${dark ? 'text-white' : 'text-gray-900'}`}>{s.storeName}</p>
                     <p className={`text-sm ${dark ? 'text-gray-400' : 'text-gray-500'}`}>
-                      Owner: {s.agentId?.name} ({s.agentId?.phoneNumber || s.agentId?.email})
+                      Owner: {s.owner?.name} ({s.owner?.phoneNumber || s.owner?.email})
                     </p>
                     <p className={`text-xs ${dark ? 'text-gray-500' : 'text-gray-400'}`}>
                       Slug: {s.storeSlug} | Status: {s.status || 'active'}

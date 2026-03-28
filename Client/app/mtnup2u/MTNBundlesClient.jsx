@@ -84,28 +84,68 @@ const Toast = ({ message, type, onClose }) => {
   );
 };
 
-// Confirm Modal for Wallet Purchase
-const ConfirmModal = ({ isOpen, onClose, onConfirm, bundle, phoneNumber, isDarkMode }) => {
+// Confirm Modal with Payment Method Selection
+const ConfirmModal = ({ isOpen, onClose, onConfirmWallet, onConfirmPaystack, bundle, phoneNumber, isDarkMode, walletBalance = 0 }) => {
+  const [payMethod, setPayMethod] = useState('wallet');
   if (!isOpen || !bundle) return null;
+  const price = parseFloat(bundle.price);
+  const canWallet = walletBalance >= price;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-scale-in`}>
-        <div className="bg-green-500 px-5 py-4">
-          <h3 className="text-xl font-bold text-white text-center">Confirm Purchase</h3>
+      <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg w-full max-w-md overflow-hidden shadow-2xl animate-scale-in`}>
+        <div className="bg-yellow-400 px-5 py-4">
+          <h3 className="text-lg font-bold text-black text-center">Confirm Purchase</h3>
         </div>
-        <div className="p-6">
-          <div className="text-center mb-5">
-            <p className={`text-5xl font-bold ${isDarkMode ? 'text-white' : 'text-black'}`}>{bundle.capacity}GB</p>
-            <p className={`text-2xl mt-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>GH₵ {bundle.price}</p>
+        <div className="p-5">
+          <div className="text-center mb-4">
+            <p className={`text-4xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{bundle.capacity}GB</p>
+            <p className={`text-xl mt-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>GH₵ {bundle.price}</p>
           </div>
-          <div className={`${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'} rounded-xl p-4 mb-5`}>
-            <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Recipient</p>
-            <p className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-black'}`}>{phoneNumber}</p>
+          <div className={`${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'} rounded-lg p-3 mb-4`}>
+            <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Recipient</p>
+            <p className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{phoneNumber}</p>
           </div>
-          <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'} mb-5 text-center`}>⚠️ This is not instant. Delivery times vary.</div>
+
+          {/* Payment Method */}
+          <div className="mb-4">
+            <p className={`text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Payment Method</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => canWallet && setPayMethod('wallet')}
+                disabled={!canWallet}
+                className={`p-3 rounded-lg border-2 text-center transition-all ${
+                  payMethod === 'wallet'
+                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                    : canWallet ? 'border-gray-200 dark:border-gray-600' : 'border-gray-200 dark:border-gray-700 opacity-40'
+                }`}
+              >
+                <p className={`text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Wallet</p>
+                <p className={`text-[10px] ${canWallet ? 'text-gray-500' : 'text-red-500'}`}>₵{walletBalance.toFixed(2)}</p>
+              </button>
+              <button
+                onClick={() => setPayMethod('paystack')}
+                className={`p-3 rounded-lg border-2 text-center transition-all ${
+                  payMethod === 'paystack'
+                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                    : 'border-gray-200 dark:border-gray-600'
+                }`}
+              >
+                <p className={`text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Paystack</p>
+                <p className="text-[10px] text-gray-500">MoMo / Card</p>
+              </button>
+            </div>
+          </div>
+
+          <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'} mb-4 text-center`}>Delivery is not instant. Times vary by network.</p>
           <div className="flex gap-3">
-            <button onClick={onClose} className={`flex-1 py-4 ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-200 text-black'} font-semibold rounded-xl text-lg`}>Cancel</button>
-            <button onClick={onConfirm} className="flex-1 py-4 bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl text-lg">Pay ₵{bundle.price}</button>
+            <button onClick={onClose} className={`flex-1 py-3 ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-200 text-gray-900'} font-medium rounded-md`}>Cancel</button>
+            <button
+              onClick={() => payMethod === 'wallet' ? onConfirmWallet() : onConfirmPaystack()}
+              className="flex-1 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold rounded-md"
+            >
+              {payMethod === 'wallet' ? `Pay ₵${bundle.price}` : 'Pay with Paystack'}
+            </button>
           </div>
         </div>
       </div>
@@ -182,6 +222,7 @@ const MTNBundlesClient = () => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
   const [isMobile, setIsMobile] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(0);
 
   const bundles = [
     { capacity: '1', price: '4.20', network: 'YELLO' },
@@ -202,7 +243,19 @@ const MTNBundlesClient = () => {
 
   useEffect(() => {
     const stored = localStorage.getItem('userData');
-    if (stored) setUserData(JSON.parse(stored));
+    if (stored) {
+      const user = JSON.parse(stored);
+      setUserData(user);
+      // Fetch wallet balance
+      const token = localStorage.getItem('authToken');
+      if (token && user.id) {
+        fetch(`${API_BASE}/api/v1/data/user-dashboard/${user.id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }).then(r => r.json()).then(d => {
+          if (d.status === 'success') setWalletBalance(d.data?.userBalance || 0);
+        }).catch(() => {});
+      }
+    }
     const theme = localStorage.getItem('dh-theme');
     setIsDarkMode(theme === 'dark');
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -239,7 +292,7 @@ const MTNBundlesClient = () => {
   };
 
   // Wallet Purchase
-  const confirmPurchase = async () => {
+  const confirmWalletPurchase = async () => {
     setShowConfirm(false);
     setIsLoading(true);
     try {
@@ -256,10 +309,56 @@ const MTNBundlesClient = () => {
         showToast(`${selectedBundle.capacity}GB sent to ${phoneNumber}`, 'success');
         setSelectedBundle(null);
         setPhoneNumber('');
+        setWalletBalance(prev => prev - parseFloat(selectedBundle.price));
       }
     } catch (err) {
       if (err.response?.status === 401) { handle401(router); return; }
       showToast(err.response?.data?.message || 'Purchase failed', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Paystack Direct Purchase
+  const confirmPaystackPurchase = async () => {
+    setShowConfirm(false);
+    setIsLoading(true);
+    try {
+      const STORE_SLUG = 'sam-1756835542914';
+      const STORE_API = 'https://api.datamartgh.shop/api/v1/agent-stores';
+
+      // Fetch store products to find matching productId
+      const productsRes = await axios.get(`${STORE_API}/stores/${STORE_SLUG}/products`);
+      const products = productsRes.data?.data?.products || [];
+      const match = products.find(p =>
+        (p.network === 'MTN' || p.network === 'YELLO') &&
+        String(p.capacity) === String(selectedBundle.capacity)
+      );
+
+      if (!match) {
+        showToast('Bundle not available for direct payment. Try wallet instead.', 'error');
+        setIsLoading(false);
+        return;
+      }
+
+      // Initialize Paystack payment
+      const initRes = await axios.post(`${STORE_API}/stores/${STORE_SLUG}/purchase/initialize`, {
+        productId: match._id,
+        recipientPhone: phoneNumber,
+        customerPhone: userData?.phoneNumber || '',
+        customerEmail: userData?.email || `${phoneNumber}@datahustle.shop`,
+        customerName: userData?.name || 'Customer',
+        isMainPlatform: true,
+        platform: 'datahustle'
+      });
+
+      if (initRes.data?.status === 'success' && initRes.data?.data?.authorizationUrl) {
+        window.location.href = initRes.data.data.authorizationUrl;
+      } else {
+        showToast(initRes.data?.message || 'Could not initialize payment', 'error');
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Payment initialization failed', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -292,7 +391,7 @@ const MTNBundlesClient = () => {
 
       {toast.visible && <Toast {...toast} onClose={() => setToast(p => ({ ...p, visible: false }))} />}
       <LoadingOverlay isLoading={isLoading} />
-      <ConfirmModal isOpen={showConfirm} onClose={() => setShowConfirm(false)} onConfirm={confirmPurchase} bundle={selectedBundle} phoneNumber={phoneNumber} isDarkMode={isDarkMode} />
+      <ConfirmModal isOpen={showConfirm} onClose={() => setShowConfirm(false)} onConfirmWallet={confirmWalletPurchase} onConfirmPaystack={confirmPaystackPurchase} bundle={selectedBundle} phoneNumber={phoneNumber} isDarkMode={isDarkMode} walletBalance={walletBalance} />
       <InfoModal isOpen={showInfo} onClose={() => setShowInfo(false)} isDarkMode={isDarkMode} />
 
       <div className="max-w-5xl mx-auto px-3 sm:px-6 py-4">

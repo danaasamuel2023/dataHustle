@@ -21,22 +21,7 @@ const datamartClient = axios.create({
   }
 });
 
-// ========== GEONETTECH API CONFIGURATION (KEPT FOR REFERENCE) ==========
-const GEONETTECH_BASE_URL = 'https://testhub.geonettech.site/api/v1';
-const GEONETTECH_API_KEY = '42|tjhxBxaWWe4mPUpxXN1uIk0KTxypvlSqOIOQWz6K162aa0d6';
-
-// Create Geonettech client (kept for potential future use)
-const geonetClient = axios.create({
-  baseURL: GEONETTECH_BASE_URL,
-  headers: {
-    'Authorization': `Bearer ${GEONETTECH_API_KEY}`,
-    'Content-Type': 'application/json'
-  }
-});
-
-// ========== TELECEL API CONFIGURATION ==========
-const TELECEL_API_URL = 'https://iget.onrender.com/api/developer/orders/place';
-const TELECEL_API_KEY = '76013fa9c8bf774ac7fb35db5e586fb7852a618cbf57b9ddb072fc2c465e5fe8';
+// All orders go through DataMart API only
 
 // Enhanced logging function
 const logOperation = (operation, data) => {
@@ -229,126 +214,45 @@ function generateMixedReference(prefix = '') {
   return reference;
 }
 
-// Helper function for Telecel API integration
-async function processTelecelOrder(recipient, capacity, reference) {
-  try {
-    const capacityInMB = capacity >= 1 && capacity < 1000 ? capacity * 1000 : capacity;
-    
-    logOperation('TELECEL_ORDER_REQUEST_PREPARED', {
-      recipient,
-      capacityGB: capacity,
-      capacityMB: capacityInMB,
-      reference
-    });
-    
-    const telecelPayload = {
-      recipientNumber: recipient,
-      capacity: capacity,
-      bundleType: "Telecel-5959",
-      reference: reference,
-    };
-    
-    logOperation('TELECEL_ORDER_REQUEST', telecelPayload);
-    
-    const response = await axios.post(
-      TELECEL_API_URL,
-      telecelPayload,
-      { 
-        headers: { 
-          'Content-Type': 'application/json',
-          'X-API-Key': TELECEL_API_KEY
-        } 
-      }
-    );
-    
-    logOperation('TELECEL_ORDER_RESPONSE', {
-      status: response.status,
-      data: response.data,
-      fullResponse: JSON.stringify(response.data, null, 2)
-    });
-    
-    // Extract the Telecel order reference from the response
-    let telecelOrderReference = null;
-    
-    if (response.data?.data?.order?.orderReference) {
-      telecelOrderReference = response.data.data.order.orderReference;
-    } else if (response.data?.data?.orderReference) {
-      telecelOrderReference = response.data.data.orderReference;
-    } else if (response.data?.orderReference) {
-      telecelOrderReference = response.data.orderReference;
-    } else if (response.data?.data?.reference) {
-      telecelOrderReference = response.data.data.reference;
-    } else if (response.data?.reference) {
-      telecelOrderReference = response.data.reference;
-    } else if (response.data?.data?.order?.id) {
-      telecelOrderReference = response.data.data.order.id;
-    } else if (response.data?.data?.id) {
-      telecelOrderReference = response.data.data.id;
-    }
-    
-    logOperation('TELECEL_ORDER_REFERENCE_EXTRACTED', {
-      telecelOrderReference,
-      originalReference: reference
-    });
-    
-    return {
-      success: true,
-      data: response.data,
-      orderId: telecelOrderReference || reference,
-      telecelReference: telecelOrderReference
-    };
-  } catch (error) {
-    logOperation('TELECEL_ORDER_ERROR', {
-      message: error.message,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data
-    });
-    
-    return {
-      success: false,
-      error: {
-        message: error.message,
-        details: error.response?.data || 'No response details available'
-      }
-    };
-  }
-}
+// ===== DATAMART ORDER PROCESSOR =====
+// Process a pending order via DataMart API (used by queue processor and retry)
+async function processOrderViaDatamart(order) {
+  const datamartNetwork = mapNetworkToDatamart(order.network);
+  const datamartPayload = {
+    phoneNumber: order.phoneNumber,
+    network: datamartNetwork,
+    capacity: order.capacity.toString(),
+    gateway: 'wallet',
+    ref: order.geonetReference
+  };
 
-// Function to check Telecel order status
-async function checkTelecelOrderStatus(reference) {
+  logOperation('DATAMART_PROCESS_ORDER', { orderId: order._id, ...datamartPayload });
+
   try {
-    logOperation('TELECEL_STATUS_CHECK_REQUEST', { reference });
-    
-    const response = await axios.get(
-      `https://iget.onrender.com/api/developer/orders/reference/${reference}`,
-      { 
-        headers: { 
-          'X-API-Key': TELECEL_API_KEY
-        } 
-      }
-    );
-    
-    logOperation('TELECEL_STATUS_CHECK_RESPONSE', response.data);
-    
-    return {
-      success: true,
-      data: response.data.data,
-      status: response.data.data?.order?.status || 'processing'
-    };
+    const response = await datamartClient.post('/api/developer/purchase', datamartPayload);
+
+    if (response.data && response.data.status === 'success') {
+      order.status = 'processing'; // DataMart accepted, will deliver
+      order.apiOrderId = response.data.data?.purchaseId || order.geonetReference;
+      order.apiResponse = response.data;
+      order.processingMethod = 'datamart_api';
+      await order.save();
+
+      logOperation('DATAMART_ORDER_ACCEPTED', { orderId: order._id, ref: order.geonetReference });
+      return { success: true, data: response.data };
+    } else {
+      order.apiResponse = response.data;
+      await order.save();
+
+      logOperation('DATAMART_ORDER_REJECTED', { orderId: order._id, response: response.data });
+      return { success: false, error: response.data?.message || 'DataMart rejected the order' };
+    }
   } catch (error) {
-    logOperation('TELECEL_STATUS_CHECK_ERROR', {
-      message: error.message,
-      response: error.response ? error.response.data : null
-    });
-    
-    return {
-      success: false,
-      error: {
-        message: error.message,
-        details: error.response?.data || 'No response details available'
-      }
-    };
+    order.apiResponse = { error: error.message, response: error.response?.data };
+    await order.save();
+
+    logOperation('DATAMART_ORDER_ERROR', { orderId: order._id, error: error.message });
+    return { success: false, error: error.message };
   }
 }
 
@@ -386,109 +290,59 @@ router.get('/agent-balance', async (req, res) => {
   }
 });
 
-// ===== MAIN PURCHASE DATA ROUTE WITH DATAMART INTEGRATION =====
+// ===== MAIN PURCHASE DATA ROUTE =====
+// Step 1: Validate, deduct wallet, save as PENDING
+// Step 2: Try DataMart API (non-blocking — order is saved either way)
 router.post('/purchase-data', async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    const { 
-      userId, 
-      phoneNumber, 
-      network, 
-      capacity, 
-      price 
-    } = req.body;
+    const { userId, phoneNumber, network, capacity, price } = req.body;
 
     logOperation('DATA_PURCHASE_REQUEST', {
       userId,
       phoneNumber: phoneNumber?.substring(0, 3) + 'XXXXXXX',
-      network,
-      capacity,
-      price,
-      timestamp: new Date()
+      network, capacity, price
     });
 
     // Validate inputs
     if (!userId || !phoneNumber || !network || !capacity || !price) {
-      logOperation('DATA_PURCHASE_VALIDATION_ERROR', {
-        missingFields: {
-          userId: !userId,
-          phoneNumber: !phoneNumber,
-          network: !network,
-          capacity: !capacity,
-          price: !price
-        }
-      });
-      
       await session.abortTransaction();
       session.endSession();
-      
-      return res.status(400).json({
-        status: 'error',
-        message: 'Missing required fields'
-      });
+      return res.status(400).json({ status: 'error', message: 'Missing required fields' });
     }
 
-    // ===== PRICE VALIDATION =====
+    // Price validation
     const priceValidation = validatePrice(network, capacity, price, userId, phoneNumber);
     if (!priceValidation.isValid) {
       await session.abortTransaction();
       session.endSession();
-      
-      return res.status(400).json({
-        status: 'error',
-        message: priceValidation.message,
-        code: priceValidation.code
-      });
+      return res.status(400).json({ status: 'error', message: priceValidation.message, code: priceValidation.code });
     }
 
-    // ===== PHONE NUMBER VALIDATION =====
+    // Phone validation
     const phoneValidation = validatePhoneNumber(network, phoneNumber);
     if (!phoneValidation.isValid) {
-      logOperation('PHONE_VALIDATION_FAILED', {
-        network,
-        phoneNumber: phoneNumber.substring(0, 3) + 'XXXXXXX',
-        validationMessage: phoneValidation.message
-      });
-      
       await session.abortTransaction();
       session.endSession();
-      
-      return res.status(400).json({
-        status: 'error',
-        message: phoneValidation.message
-      });
+      return res.status(400).json({ status: 'error', message: phoneValidation.message });
     }
 
     // Find user
     const user = await User.findById(userId).session(session);
     if (!user) {
-      logOperation('DATA_PURCHASE_USER_NOT_FOUND', { userId });
-      
       await session.abortTransaction();
       session.endSession();
-      
-      return res.status(404).json({
-        status: 'error',
-        message: 'User not found'
-      });
+      return res.status(404).json({ status: 'error', message: 'User not found' });
     }
 
     const validatedPrice = priceValidation.validatedPrice;
 
-    // Check user wallet balance
+    // Check wallet balance
     if (user.walletBalance < validatedPrice) {
-      logOperation('DATA_PURCHASE_INSUFFICIENT_BALANCE', {
-        userId,
-        walletBalance: user.walletBalance,
-        requiredAmount: validatedPrice,
-        shortfall: validatedPrice - user.walletBalance
-      });
-      
       await session.abortTransaction();
       session.endSession();
-      
       return res.status(400).json({
         status: 'error',
         message: 'Insufficient wallet balance',
@@ -497,420 +351,36 @@ router.post('/purchase-data', async (req, res) => {
       });
     }
 
-    // Get the inventory record
+    // Check inventory
     const inventory = await DataInventory.findOne({ network }).session(session);
-    
-    logOperation('DATA_INVENTORY_CHECK', {
-      network,
-      inventoryFound: !!inventory,
-      inStock: inventory ? inventory.inStock : true,
-      skipGeonettech: inventory ? inventory.skipGeonettech : false
-    });
-    
-    // Check if in stock
     if (inventory && !inventory.inStock) {
-      logOperation('DATA_INVENTORY_OUT_OF_STOCK', {
-        network,
-        inventoryExists: !!inventory
-      });
-      
       await session.abortTransaction();
       session.endSession();
-      
       return res.status(400).json({
         status: 'error',
-        message: `${network} data bundles are currently out of stock. Please try again later or choose another network.`
+        message: `${network} data bundles are currently out of stock.`
       });
     }
-    
-    // Generate unique references
+
+    // Generate references
     const transactionReference = `TRX-${uuidv4()}`;
-    
-    // Determine order reference prefix based on network and processing method
-    let orderReferencePrefix = '';
-    const shouldSkipGeonet = inventory?.skipGeonettech && network !== 'TELECEL' && network !== 'AT_PREMIUM';
-    
-    if (network === 'TELECEL') {
-      // For Telecel, check if we're using DataMart or Telecel API
-      if (inventory?.skipGeonettech) {
-        orderReferencePrefix = 'TC-'; // Direct Telecel API prefix
-      } else {
-        orderReferencePrefix = 'DM-TC-'; // DataMart Telecel prefix
-      }
-    } else if (network === 'AT_PREMIUM') {
-      orderReferencePrefix = 'DM-ATP-'; // DataMart AT_PREMIUM prefix
-    } else if (shouldSkipGeonet) {
-      orderReferencePrefix = 'MN-'; // Manual processing prefix
-    } else {
-      orderReferencePrefix = 'DM-'; // General DataMart prefix
-    }
-    
-    let orderReference = generateMixedReference(orderReferencePrefix);
-    const originalInternalReference = orderReference;
+    const orderReference = generateMixedReference('DM-');
 
-    // PROCESSING SECTION
-    let orderResponse = null;
-    let apiOrderId = null;
-    let orderStatus = 'completed';
-    let processingMethod = 'api';
-    
-    logOperation('API_PROCESSING_DECISION', {
+    // Create order as PENDING — will be processed via DataMart
+    const dataPurchase = new DataPurchase({
+      userId,
+      phoneNumber,
       network,
-      skipGeonettech: inventory?.skipGeonettech,
-      shouldSkipGeonet,
-      orderReference,
-      prefix: orderReferencePrefix,
-      isATPremium: network === 'AT_PREMIUM',
-      isTelecel: network === 'TELECEL'
+      capacity,
+      gateway: 'wallet',
+      method: 'web',
+      price: validatedPrice,
+      status: 'pending',
+      geonetReference: orderReference,
+      processingMethod: 'datamart_api'
     });
-    
-    if (network === 'TELECEL') {
-      // Check if we should use DataMart or Telecel API
-      if (inventory?.skipGeonettech) {
-        // Use Telecel API directly
-        processingMethod = 'telecel_api';
-        logOperation('USING_TELECEL_API', {
-          network,
-          phoneNumber: phoneNumber.substring(0, 3) + 'XXXXXXX',
-          capacity,
-          orderReference
-        });
-        
-        try {
-          const telecelResponse = await processTelecelOrder(phoneNumber, capacity, orderReference);
-          
-          if (!telecelResponse.success) {
-            logOperation('TELECEL_API_ERROR', {
-              error: telecelResponse.error,
-              orderReference
-            });
-            
-            await session.abortTransaction();
-            session.endSession();
-            
-            let errorMessage = 'Could not complete your purchase. Please try again later.';
-            
-            if (telecelResponse.error && telecelResponse.error.message) {
-              errorMessage = telecelResponse.error.message;
-            }
-            
-            if (telecelResponse.error && telecelResponse.error.details && 
-                typeof telecelResponse.error.details === 'object' && 
-                telecelResponse.error.details.message) {
-              errorMessage = telecelResponse.error.details.message;
-            }
-            
-            return res.status(400).json({
-              status: 'error',
-              message: errorMessage
-            });
-          }
-          
-          orderResponse = telecelResponse.data;
-          orderStatus = 'completed';
-          
-          if (telecelResponse.telecelReference) {
-            apiOrderId = telecelResponse.telecelReference;
-            orderReference = telecelResponse.telecelReference;
-            
-            logOperation('TELECEL_REFERENCE_UPDATE', {
-              originalReference: originalInternalReference,
-              telecelReference: telecelResponse.telecelReference,
-              finalReference: orderReference
-            });
-          } else {
-            apiOrderId = orderReference;
-            logOperation('TELECEL_NO_REFERENCE_RETURNED', {
-              usingOriginalReference: orderReference
-            });
-          }
-          
-          logOperation('TELECEL_ORDER_SUCCESS', {
-            orderId: apiOrderId,
-            orderReference: orderReference,
-            telecelReference: telecelResponse.telecelReference,
-            originalInternalReference: originalInternalReference,
-            processingMethod
-          });
-        } catch (telecelError) {
-          logOperation('TELECEL_API_EXCEPTION', {
-            error: telecelError.message,
-            stack: telecelError.stack,
-            orderReference
-          });
-          
-          await session.abortTransaction();
-          session.endSession();
-          
-          return res.status(400).json({
-            status: 'error',
-            message: 'Unable to process your order. Please try again later.'
-          });
-        }
-      } else {
-        // Use DataMart API for Telecel
-        processingMethod = 'datamart_api';
-        try {
-          const datamartNetwork = mapNetworkToDatamart('TELECEL');
-          const datamartPayload = {
-            phoneNumber: phoneNumber,
-            network: datamartNetwork,
-            capacity: capacity.toString(),
-            gateway: 'wallet',
-            ref: orderReference
-          };
-          
-          logOperation('DATAMART_TELECEL_ORDER_REQUEST', {
-            ...datamartPayload,
-            processingMethod
-          });
-          
-          const datamartResponse = await datamartClient.post('/api/developer/purchase', datamartPayload);
-          orderResponse = datamartResponse.data;
-          
-          if (!orderResponse || !orderResponse.status || orderResponse.status !== 'success') {
-            logOperation('DATAMART_TELECEL_API_UNSUCCESSFUL_RESPONSE', {
-              response: orderResponse,
-              orderReference
-            });
-            
-            await session.abortTransaction();
-            session.endSession();
-            
-            let errorMessage = 'Could not complete your purchase. Please try again later.';
-            
-            if (orderResponse && orderResponse.message) {
-              const msg = orderResponse.message.toLowerCase();
-              
-              if (msg.includes('duplicate') || msg.includes('within 5 minutes')) {
-                errorMessage = 'A similar order was recently placed. Please wait a few minutes before trying again.';
-              } else if (msg.includes('invalid') || msg.includes('phone')) {
-                errorMessage = 'The phone number you entered appears to be invalid. Please check and try again.';
-              } else {
-                errorMessage = orderResponse.message;
-              }
-            }
-            
-            return res.status(400).json({
-              status: 'error',
-              message: errorMessage
-            });
-          }
-          
-          apiOrderId = orderResponse.data ? orderResponse.data.purchaseId : orderReference;
-          orderStatus = 'completed';
-          
-          logOperation('DATAMART_TELECEL_ORDER_SUCCESS', {
-            orderId: apiOrderId,
-            orderReference,
-            processingMethod,
-            responseData: orderResponse
-          });
-        } catch (apiError) {
-          logOperation('DATAMART_TELECEL_API_ERROR', {
-            error: apiError.message,
-            response: apiError.response ? apiError.response.data : null,
-            orderReference
-          });
-          
-          await session.abortTransaction();
-          session.endSession();
-          
-          let errorMessage = 'Could not complete your purchase. Please try again later.';
-          
-          if (apiError.response && apiError.response.data && apiError.response.data.message) {
-            errorMessage = apiError.response.data.message;
-          }
-          
-          return res.status(400).json({
-            status: 'error',
-            message: errorMessage
-          });
-        }
-      }
-    } else if (network === 'AT_PREMIUM') {
-      // AT_PREMIUM always uses DataMart API
-      processingMethod = 'datamart_api';
-      try {
-        const datamartNetwork = mapNetworkToDatamart('AT_PREMIUM'); // Maps to 'at'
-        const datamartPayload = {
-          phoneNumber: phoneNumber,
-          network: datamartNetwork,
-          capacity: capacity.toString(),
-          gateway: 'wallet',
-          ref: orderReference
-        };
-        
-        logOperation('DATAMART_AT_PREMIUM_ORDER_REQUEST', {
-          ...datamartPayload,
-          processingMethod
-        });
-        
-        const datamartResponse = await datamartClient.post('/api/developer/purchase', datamartPayload);
-        orderResponse = datamartResponse.data;
-        
-        if (!orderResponse || !orderResponse.status || orderResponse.status !== 'success') {
-          logOperation('DATAMART_AT_PREMIUM_API_UNSUCCESSFUL_RESPONSE', {
-            response: orderResponse,
-            orderReference
-          });
-          
-          await session.abortTransaction();
-          session.endSession();
-          
-          let errorMessage = 'Could not complete your purchase. Please try again later.';
-          
-          if (orderResponse && orderResponse.message) {
-            const msg = orderResponse.message.toLowerCase();
-            
-            if (msg.includes('duplicate') || msg.includes('within 5 minutes')) {
-              errorMessage = 'A similar order was recently placed. Please wait a few minutes before trying again.';
-            } else if (msg.includes('invalid') || msg.includes('phone')) {
-              errorMessage = 'The phone number you entered appears to be invalid. Please check and try again.';
-            } else {
-              errorMessage = orderResponse.message;
-            }
-          }
-          
-          return res.status(400).json({
-            status: 'error',
-            message: errorMessage
-          });
-        }
-        
-        apiOrderId = orderResponse.data ? orderResponse.data.purchaseId : orderReference;
-        orderStatus = 'completed';
-        
-        logOperation('DATAMART_AT_PREMIUM_ORDER_SUCCESS', {
-          orderId: apiOrderId,
-          orderReference,
-          processingMethod,
-          responseData: orderResponse
-        });
-      } catch (apiError) {
-        logOperation('DATAMART_AT_PREMIUM_API_ERROR', {
-          error: apiError.message,
-          response: apiError.response ? apiError.response.data : null,
-          orderReference
-        });
-        
-        await session.abortTransaction();
-        session.endSession();
-        
-        let errorMessage = 'Could not complete your purchase. Please try again later.';
-        
-        if (apiError.response && apiError.response.data && apiError.response.data.message) {
-          errorMessage = apiError.response.data.message;
-        }
-        
-        return res.status(400).json({
-          status: 'error',
-          message: errorMessage
-        });
-      }
-    } else if (shouldSkipGeonet) {
-      // Skip DataMart API - store as pending for manual processing
-      processingMethod = 'manual';
-      logOperation('SKIPPING_DATAMART_API', {
-        network,
-        phoneNumber: phoneNumber.substring(0, 3) + 'XXXXXXX',
-        capacity,
-        orderReference,
-        processingMethod
-      });
-      
-      orderStatus = 'pending';
-      apiOrderId = orderReference;
-      orderResponse = {
-        status: 'pending',
-        message: 'Order stored for manual processing',
-        reference: orderReference,
-        processingMethod: 'manual',
-        skipReason: 'API disabled for network'
-      };
-    } else {
-      // Use DataMart API for other networks (YELLO, at)
-      processingMethod = 'datamart_api';
-      try {
-        const datamartNetwork = mapNetworkToDatamart(network);
-        const datamartPayload = {
-          phoneNumber: phoneNumber,
-          network: datamartNetwork,
-          capacity: capacity.toString(),
-          gateway: 'wallet',
-          ref: orderReference
-        };
-        
-        logOperation('DATAMART_ORDER_REQUEST', {
-          ...datamartPayload,
-          processingMethod
-        });
-        
-        const datamartResponse = await datamartClient.post('/api/developer/purchase', datamartPayload);
-        orderResponse = datamartResponse.data;
-        
-        if (!orderResponse || !orderResponse.status || orderResponse.status !== 'success') {
-          logOperation('DATAMART_API_UNSUCCESSFUL_RESPONSE', {
-            response: orderResponse,
-            orderReference
-          });
-          
-          await session.abortTransaction();
-          session.endSession();
-          
-          let errorMessage = 'Could not complete your purchase. Please try again later.';
-          
-          if (orderResponse && orderResponse.message) {
-            const msg = orderResponse.message.toLowerCase();
-            
-            if (msg.includes('duplicate') || msg.includes('within 5 minutes')) {
-              errorMessage = 'A similar order was recently placed. Please wait a few minutes before trying again.';
-            } else if (msg.includes('invalid') || msg.includes('phone')) {
-              errorMessage = 'The phone number you entered appears to be invalid. Please check and try again.';
-            } else {
-              errorMessage = orderResponse.message;
-            }
-          }
-          
-          return res.status(400).json({
-            status: 'error',
-            message: errorMessage
-          });
-        }
-        
-        apiOrderId = orderResponse.data ? orderResponse.data.purchaseId : orderReference;
-        orderStatus = 'completed';
-        
-        logOperation('DATAMART_ORDER_SUCCESS', {
-          orderId: apiOrderId,
-          orderReference,
-          processingMethod,
-          responseData: orderResponse
-        });
-      } catch (apiError) {
-        logOperation('DATAMART_API_ERROR', {
-          error: apiError.message,
-          response: apiError.response ? apiError.response.data : null,
-          orderReference
-        });
-        
-        await session.abortTransaction();
-        session.endSession();
-        
-        let errorMessage = 'Could not complete your purchase. Please try again later.';
-        
-        if (apiError.response && apiError.response.data && apiError.response.data.message) {
-          errorMessage = apiError.response.data.message;
-        }
-        
-        return res.status(400).json({
-          status: 'error',
-          message: errorMessage
-        });
-      }
-    }
 
-    // Create Transaction
+    // Create wallet transaction
     const transaction = new Transaction({
       userId,
       type: 'purchase',
@@ -921,67 +391,32 @@ router.post('/purchase-data', async (req, res) => {
       description: `Data purchase: ${capacity}GB ${network} for ${phoneNumber}`
     });
 
-    // Create Data Purchase
-    const dataPurchase = new DataPurchase({
-      userId,
-      phoneNumber,
-      network,
-      capacity,
-      gateway: 'wallet',
-      method: 'web',
-      price: validatedPrice,
-      status: orderStatus,
-      geonetReference: orderReference, // Keep this field name for backward compatibility
-      apiOrderId: apiOrderId,
-      apiResponse: orderResponse,
-      skipGeonettech: shouldSkipGeonet,
-      processingMethod: processingMethod,
-      orderReferencePrefix: orderReferencePrefix,
-      originalReference: (network === 'TELECEL' && inventory?.skipGeonettech) ? originalInternalReference : null
-    });
-
-    // Update user wallet
+    // Deduct wallet
     const previousBalance = user.walletBalance;
     user.walletBalance -= validatedPrice;
-
-    // Link transaction to purchase
     transaction.relatedPurchaseId = dataPurchase._id;
 
-    // Save all documents
+    // Save all atomically
     await transaction.save({ session });
     await dataPurchase.save({ session });
     await user.save({ session });
 
-    // Commit transaction
     await session.commitTransaction();
     session.endSession();
 
-    // Prepare response message
-    let responseMessage = 'Data bundle purchased successfully';
-    if (orderStatus === 'pending' && processingMethod === 'manual') {
-      responseMessage = 'Order placed successfully. Your order will be processed manually.';
-    }
+    logOperation('DATA_PURCHASE_SAVED_PENDING', {
+      userId, orderReference, network, capacity,
+      previousBalance, newBalance: user.walletBalance
+    });
 
-    logOperation('DATA_PURCHASE_SUCCESS', {
-      userId,
-      orderStatus,
-      orderReference,
-      processingMethod,
-      skipGeonettech: shouldSkipGeonet,
-      previousBalance: previousBalance,
-      newWalletBalance: user.walletBalance,
-      amountDeducted: validatedPrice,
-      validatedPrice: validatedPrice,
-      telecelReference: (network === 'TELECEL' && inventory?.skipGeonettech) ? orderReference : null,
-      originalInternalReference: (network === 'TELECEL' && inventory?.skipGeonettech) ? originalInternalReference : null,
-      isATPremium: network === 'AT_PREMIUM',
-      usedDatamart: processingMethod === 'datamart_api',
-      usedTelecelAPI: processingMethod === 'telecel_api'
+    // Now try to process via DataMart (non-blocking — order already saved)
+    processOrderViaDatamart(dataPurchase).catch(err => {
+      logOperation('ASYNC_DATAMART_PROCESS_ERROR', { orderId: dataPurchase._id, error: err.message });
     });
 
     res.status(201).json({
       status: 'success',
-      message: responseMessage,
+      message: 'Order placed successfully. Processing your data bundle.',
       data: {
         transaction,
         dataPurchase,
@@ -990,30 +425,18 @@ router.post('/purchase-data', async (req, res) => {
           current: user.walletBalance,
           deducted: validatedPrice
         },
-        orderStatus: orderStatus,
-        orderReference: orderReference,
-        processingMethod: processingMethod,
-        orderPrefix: orderReferencePrefix,
-        validatedPrice: validatedPrice,
-        usedDatamart: processingMethod === 'datamart_api',
-        usedTelecelAPI: processingMethod === 'telecel_api'
+        orderStatus: 'pending',
+        orderReference,
+        processingMethod: 'datamart_api',
+        validatedPrice
       }
     });
 
   } catch (error) {
-    await session.abortTransaction();
+    if (session.inTransaction()) await session.abortTransaction();
     session.endSession();
-    
-    logOperation('DATA_PURCHASE_ERROR', {
-      message: error.message,
-      stack: error.stack,
-      response: error.response ? {
-        status: error.response.status,
-        statusText: error.response.statusText,
-        data: error.response.data
-      } : null
-    });
 
+    logOperation('DATA_PURCHASE_ERROR', { message: error.message });
     res.status(500).json({
       status: 'error',
       message: 'Could not complete your purchase. Please try again later.'
@@ -1051,121 +474,31 @@ router.get('/order-status/:orderId', async (req, res) => {
       processingMethod: localOrder.processingMethod
     });
 
-    // Check status based on network and processing method
-    if (localOrder.network === 'TELECEL' && localOrder.processingMethod === 'telecel_api') {
-      // Check status with Telecel API
-      logOperation('TELECEL_STATUS_CHECK_REQUEST', {
-        geonetReference: localOrder.geonetReference
-      });
-      
-      const telecelStatusResponse = await checkTelecelOrderStatus(localOrder.geonetReference);
-      
-      if (telecelStatusResponse.success) {
-        // Update local order status if needed
-        const apiStatus = telecelStatusResponse.status;
-        if (apiStatus && localOrder.status !== apiStatus) {
-          logOperation('ORDER_STATUS_UPDATE_REQUIRED', {
-            oldStatus: localOrder.status,
-            newStatus: apiStatus
-          });
-          
-          localOrder.status = apiStatus;
-          await localOrder.save();
-          
-          logOperation('ORDER_STATUS_UPDATE_COMPLETED', {
-            orderId,
-            status: localOrder.status
-          });
-        }
-        
-        res.json({
-          status: 'success',
-          data: {
-            localOrder,
-            apiStatus: telecelStatusResponse.data
-          }
-        });
-      } else {
-        res.json({
-          status: 'success',
-          data: {
-            localOrder,
-            apiStatus: null,
-            apiError: telecelStatusResponse.error
-          }
-        });
-      }
-    } else if (localOrder.processingMethod === 'manual') {
-      // For manual processing, just return the local status
-      res.json({
-        status: 'success',
-        data: {
-          localOrder,
-          manualProcessing: true
-        }
-      });
-    } else if (localOrder.processingMethod === 'datamart_api') {
-      // Check status with DataMart
-      logOperation('DATAMART_STATUS_CHECK_REQUEST', {
-        purchaseId: localOrder.apiOrderId
-      });
-      
+    // If order has a DataMart API ID, check status with DataMart
+    if (localOrder.apiOrderId && localOrder.status !== 'completed') {
       try {
         const datamartResponse = await datamartClient.get(`/api/purchase-status/${localOrder.apiOrderId}`);
-        
-        logOperation('DATAMART_STATUS_CHECK_RESPONSE', {
-          status: datamartResponse.status,
-          data: datamartResponse.data
-        });
-        
-        // Update local order status if needed
-        if (datamartResponse.data.status === 'completed' && 
-            localOrder.status !== 'completed') {
-          
-          logOperation('ORDER_STATUS_UPDATE_REQUIRED', {
-            oldStatus: localOrder.status,
-            newStatus: 'completed'
-          });
-          
+
+        if (datamartResponse.data.status === 'completed' && localOrder.status !== 'completed') {
           localOrder.status = 'completed';
           await localOrder.save();
-          
-          logOperation('ORDER_STATUS_UPDATE_COMPLETED', {
-            orderId,
-            status: localOrder.status
-          });
+          logOperation('ORDER_STATUS_UPDATED', { orderId, newStatus: 'completed' });
         }
 
-        res.json({
+        return res.json({
           status: 'success',
-          data: {
-            localOrder,
-            datamartStatus: datamartResponse.data
-          }
+          data: { localOrder, datamartStatus: datamartResponse.data }
         });
       } catch (datamartError) {
-        logOperation('DATAMART_STATUS_CHECK_ERROR', {
-          error: datamartError.message
-        });
-        
-        res.json({
+        return res.json({
           status: 'success',
-          data: {
-            localOrder,
-            datamartStatus: null,
-            datamartError: datamartError.message
-          }
+          data: { localOrder, datamartError: datamartError.message }
         });
       }
-    } else {
-      // For any other case, return local status
-      res.json({
-        status: 'success',
-        data: {
-          localOrder
-        }
-      });
     }
+
+    // Return local status
+    res.json({ status: 'success', data: { localOrder } });
 
   } catch (error) {
     logOperation('ORDER_STATUS_CHECK_ERROR', {
@@ -2113,6 +1446,78 @@ router.get('/daily-sales', async (req, res) => {
       message: 'Failed to fetch daily sales data',
       details: error.message
     });
+  }
+});
+
+// ===== ORDER QUEUE PROCESSOR =====
+// Processes all pending orders via DataMart API
+// Called by cron job or manually from admin/support
+router.post('/process-pending-orders', async (req, res) => {
+  try {
+    const pendingOrders = await DataPurchase.find({ status: 'pending' })
+      .sort({ createdAt: 1 })
+      .limit(50);
+
+    if (pendingOrders.length === 0) {
+      return res.json({ status: 'success', message: 'No pending orders', processed: 0 });
+    }
+
+    logOperation('QUEUE_PROCESSOR_START', { count: pendingOrders.length });
+
+    const results = { success: 0, failed: 0, errors: [] };
+
+    for (const order of pendingOrders) {
+      try {
+        const result = await processOrderViaDatamart(order);
+        if (result.success) {
+          results.success++;
+        } else {
+          results.failed++;
+          results.errors.push({ ref: order.geonetReference, error: result.error });
+        }
+      } catch (err) {
+        results.failed++;
+        results.errors.push({ ref: order.geonetReference, error: err.message });
+      }
+    }
+
+    logOperation('QUEUE_PROCESSOR_DONE', results);
+
+    res.json({
+      status: 'success',
+      message: `Processed ${results.success + results.failed} orders`,
+      data: results
+    });
+  } catch (error) {
+    logOperation('QUEUE_PROCESSOR_ERROR', { error: error.message });
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// Retry a single order (support/admin)
+router.post('/retry-order/:id', async (req, res) => {
+  try {
+    const order = await DataPurchase.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ status: 'error', message: 'Order not found' });
+    }
+    if (order.status === 'completed') {
+      return res.status(400).json({ status: 'error', message: 'Order already completed' });
+    }
+
+    // Reset to pending so processor picks it up
+    order.status = 'pending';
+    await order.save();
+
+    const result = await processOrderViaDatamart(order);
+
+    res.json({
+      status: result.success ? 'success' : 'failed',
+      message: result.success ? 'Order sent to DataMart' : result.error,
+      data: { orderId: order._id, ref: order.geonetReference, orderStatus: order.status }
+    });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
   }
 });
 

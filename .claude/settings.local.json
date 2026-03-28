@@ -4,7 +4,14 @@
       "Bash(powershell.exe -Command \"Get-ChildItem ''C:\\\\Users\\\\HP\\\\Desktop'' | Where-Object { $_.Name -like ''*store*'' -or $_.Name -like ''*hustle*'' } | Select-Object Name, FullName\")",
       "Bash(cmd.exe /c \"dir C:\\\\Users\\\\HP\\\\Desktop\\\\datahustle-store\")",
       "Bash(cmd.exe /c \"dir C:\\\\Users\\\\HP\\\\Desktop\\\\datahustle-store 2>&1\")",
-      "Bash(cmd.exe /c \"if exist C:\\\\Users\\\\HP\\\\Desktop\\\\datahustle-store \\(echo EXISTS\\) else \\(echo NOT_FOUND\\)\")"
+      "Bash(cmd.exe /c \"if exist C:\\\\Users\\\\HP\\\\Desktop\\\\datahustle-store \\(echo EXISTS\\) else \\(echo NOT_FOUND\\)\")",
+      "Bash(dir:*)",
+      "Bash(powershell.exe -Command \"Get-ChildItem -Path ''C:\\\\Users\\\\HP\\\\Desktop\\\\DataMart\\\\Client\\\\app\\\\store'' -Recurse -Name\")",
+      "Bash(powershell.exe -Command \"Test-Path ''C:\\\\Users\\\\HP\\\\Downloads\\\\agent-dashboard''\")",
+      "Bash(powershell.exe -Command \"Get-ChildItem -Path ''C:\\\\Users\\\\HP\\\\Downloads\\\\agent-dashboard'' -Depth 1 | Select-Object -ExpandProperty Name\")",
+      "Bash(powershell.exe -Command \"Get-ChildItem -Path ''C:\\\\Users\\\\HP\\\\Downloads\\\\agent-dashboard'' -Recurse -Include ''*.js'',''*.jsx'',''*.ts'',''*.tsx'' -Name | Where-Object { $_-notmatch ''node_modules|\\\\.next'' }\")",
+      "Bash(powershell.exe -Command \"Get-ChildItem ''C:\\\\Users\\\\HP\\\\Downloads\\\\agent-dashboard\\\\app'' -Recurse -Depth 4 -Name -Exclude ''node_modules'',''.next''\")",
+      "Bash(powershell.exe -Command \"Get-ChildItem ''C:\\\\Users\\\\HP\\\\Downloads\\\\agent-dashboard\\\\agent-dashboard\\\\app'' -Recurse -Depth 4 -Name\")"
     ]
   }
 }

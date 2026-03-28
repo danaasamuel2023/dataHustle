@@ -14,7 +14,9 @@ import {
   XCircle,
   Phone,
   Calendar,
-  Filter
+  Filter,
+  RefreshCw,
+  ShieldCheck
 } from 'lucide-react';
 
 const API_BASE = 'https://datahustle.onrender.com/api/v1';
@@ -132,6 +134,36 @@ export default function OrdersPage() {
         return { icon: XCircle, class: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400', label: 'Refunded' };
       default:
         return { icon: Clock, class: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400', label: status };
+    }
+  };
+
+  const [retrying, setRetrying] = useState(null);
+
+  const handleVerifyAndRetry = async (transactionId) => {
+    if (!store || retrying) return;
+    if (!confirm('Verify payment and retry delivery for this order?')) return;
+
+    setRetrying(transactionId);
+    try {
+      const token = getAuthToken();
+      const res = await fetch(`${API_BASE}/agent-store/stores/${store._id}/orders/${transactionId}/verify-and-retry`, {
+        method: 'POST',
+        headers: { 'x-auth-token': token, 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+
+      if (data.status === 'success') {
+        alert('Order fulfilled successfully!');
+        fetchOrders(page);
+      } else if (data.status === 'failed') {
+        alert(data.message || 'Delivery failed. Try again shortly.');
+      } else {
+        alert(data.message || 'Could not process this order.');
+      }
+    } catch (error) {
+      alert('Network error. Please try again.');
+    } finally {
+      setRetrying(null);
     }
   };
 
@@ -264,6 +296,23 @@ export default function OrdersPage() {
                     </p>
                   </div>
                 </div>
+
+                {/* Verify & Retry button for stuck orders */}
+                {(order.orderStatus === 'processing' || order.orderStatus === 'paid') && (
+                  <div className="px-4 pb-2">
+                    <button
+                      onClick={() => handleVerifyAndRetry(order.transactionId)}
+                      disabled={retrying === order.transactionId}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-400 text-white text-xs font-medium rounded-lg transition-colors"
+                    >
+                      {retrying === order.transactionId ? (
+                        <><Loader2 className="w-3 h-3 animate-spin" /> Verifying...</>
+                      ) : (
+                        <><ShieldCheck className="w-3 h-3" /> Verify Payment & Retry</>
+                      )}
+                    </button>
+                  </div>
+                )}
 
                 {/* Order Details */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-gray-100 dark:bg-gray-700 border-t border-gray-100 dark:border-gray-700">

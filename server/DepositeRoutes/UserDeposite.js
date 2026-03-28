@@ -799,4 +799,125 @@ router.get('/admin/fraud-alerts', auth, async (req, res) => {
   }
 });
 
+// =============================================================================
+// MOMO CLAIM — Claim MoMo payments from DataMart's shared pool
+// =============================================================================
+
+const DATAMART_API_URL = 'https://api.datamartgh.shop';
+const DATAMART_API_KEY_CLAIM = process.env.DATAMART_API_KEY || 'fb9b9e81e9640c1861605b4ec333e3bd57bdf70dcce461d766fa877c9c0f7553';
+
+const datamartPayments = axios.create({
+  baseURL: DATAMART_API_URL,
+  headers: {
+    'x-api-key': DATAMART_API_KEY_CLAIM,
+    'Content-Type': 'application/json'
+  }
+});
+
+/**
+ * GET /api/v1/momo/check/:trxId
+ * Check if a MoMo payment exists on DataMart and is claimable
+ */
+router.get('/momo/check/:trxId', auth, async (req, res) => {
+  try {
+    const { trxId } = req.params;
+    if (!trxId) return res.status(400).json({ status: 'error', message: 'Transaction ID required' });
+
+    const response = await datamartPayments.get(`/api/payments/external/check/${trxId}`);
+
+    if (response.data?.success) {
+      return res.json({ status: 'success', data: response.data.data });
+    }
+
+    return res.status(404).json({ status: 'error', message: 'Payment not found' });
+  } catch (error) {
+    const msg = error.response?.data?.message || 'Could not check payment';
+    const status = error.response?.status || 500;
+    return res.status(status).json({ status: 'error', message: msg });
+  }
+});
+
+/**
+ * POST /api/v1/momo/claim
+ * Claim a MoMo payment and credit user's dataHustle wallet
+ * Body: { trxId }
+ */
+router.post('/momo/claim', auth, async (req, res) => {
+  const { trxId } = req.body;
+  if (!trxId) return res.status(400).json({ status: 'error', message: 'Transaction ID required' });
+
+  const session = await mongoose.startSession();
+  try {
+    // Step 1: Claim on DataMart
+    const claimResponse = await datamartPayments.post('/api/payments/external/claim', {
+      trxId,
+      platformUserId: req.user._id.toString(),
+      platformUserName: req.user.name || req.user.email
+    });
+
+    if (!claimResponse.data?.success) {
+      return res.status(400).json({ status: 'error', message: claimResponse.data?.message || 'Claim failed' });
+    }
+
+    const { amount, senderName } = claimResponse.data.data;
+
+    // Step 2: Credit dataHustle wallet atomically
+    session.startTransaction();
+
+    const user = await User.findById(req.user._id).session(session);
+    if (!user) {
+      await session.abortTransaction();
+      return res.status(404).json({ status: 'error', message: 'User not found' });
+    }
+
+    const balanceBefore = user.walletBalance || 0;
+    user.walletBalance = balanceBefore + amount;
+
+    const transaction = new Transaction({
+      userId: user._id,
+      type: 'deposit',
+      amount,
+      status: 'completed',
+      reference: `MOMO-${trxId}`,
+      gateway: 'momo',
+      description: `MoMo deposit from ${senderName || 'Unknown'} - TrxId: ${trxId}`
+    });
+
+    await transaction.save({ session });
+    await user.save({ session });
+
+    await session.commitTransaction();
+
+    console.log(`[MOMO_CLAIM] User ${user._id} claimed ${amount} from trxId ${trxId}`);
+
+    // Send SMS notification
+    try {
+      const smsMessage = `Hello ${user.name}! Your DataHustle wallet has been credited with GHS ${amount.toFixed(2)}. New balance: GHS ${user.walletBalance.toFixed(2)}.`;
+      await axios.get(`https://apps.mnotify.net/smsapi?key=${SMS_CONFIG.API_KEY}&to=${user.phoneNumber}&msg=${encodeURIComponent(smsMessage)}&sender_id=${SMS_CONFIG.SENDER_ID}`);
+    } catch (smsErr) {
+      // SMS failure is not critical
+    }
+
+    return res.json({
+      status: 'success',
+      message: 'Wallet credited successfully',
+      data: {
+        amount,
+        senderName: senderName || 'Unknown',
+        trxId,
+        newBalance: user.walletBalance
+      }
+    });
+
+  } catch (error) {
+    if (session.inTransaction()) await session.abortTransaction();
+    const msg = error.response?.data?.message || error.message || 'Could not process claim';
+    const status = error.response?.status || 500;
+    console.error(`[MOMO_CLAIM_ERROR] ${trxId}:`, msg);
+    return res.status(status).json({ status: 'error', message: msg });
+  } finally {
+    session.endSession();
+  }
+});
+
 module.exports = router;

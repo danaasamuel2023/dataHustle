@@ -6,18 +6,25 @@ const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const { User, DataPurchase, Transaction, DataInventory } = require('../schema/schema');
 
-// Geonettech API Configuration
-const GEONETTECH_BASE_URL = 'https://connect.geonettech.com/api/v1';
-const GEONETTECH_API_KEY = process.env.GEONETTECH_API_KEY || '21|rkrw7bcoGYjK8irAOTMaZ8sc1LRHYcwjuZnZmMNw4a6196f1';
+// DataMart API Configuration
+const DATAMART_BASE_URL = 'https://api.datamartgh.shop';
+const DATAMART_API_KEY = process.env.DATAMART_API_KEY || 'fb9b9e81e9640c1861605b4ec333e3bd57bdf70dcce461d766fa877c9c0f7553';
 
-// Create Geonettech client
-const geonetClient = axios.create({
-  baseURL: GEONETTECH_BASE_URL,
+const datamartClient = axios.create({
+  baseURL: DATAMART_BASE_URL,
   headers: {
-    'Authorization': `Bearer ${GEONETTECH_API_KEY}`,
+    'x-api-key': DATAMART_API_KEY,
     'Content-Type': 'application/json'
   }
 });
+
+const mapNetworkToDatamart = (network) => {
+  const networkMap = {
+    'TELECEL': 'TELECEL', 'MTN': 'YELLO', 'YELLO': 'YELLO',
+    'AT': 'at', 'AT_PREMIUM': 'at', 'AIRTELTIGO': 'at', 'at': 'at'
+  };
+  return networkMap[network?.toUpperCase()] || network;
+};
 
 // Enhanced logging function
 const logOperation = (operation, data) => {
@@ -238,90 +245,25 @@ router.post('/bulk-purchase-data', async (req, res) => {
     user.walletBalance -= totalCost;
     await user.save({ session });
     
-    // Check agent balance - this call is outside the transaction
-    let agentBalanceResponse;
+    // Save all orders as PENDING — queue processor sends to DataMart
     try {
-      // End the MongoDB session temporarily to make API calls
       await session.commitTransaction();
       session.endSession();
-      
-      agentBalanceResponse = await geonetClient.get('/wallet/balance');
-      const agentBalance = parseFloat(agentBalanceResponse.data.data.balance.replace(/,/g, ''));
-      
-      if (agentBalance < totalCost) {
-        logOperation('BULK_PURCHASE_AGENT_INSUFFICIENT_BALANCE', {
-          agentBalance,
-          requiredAmount: totalCost
-        });
-        
-        // Since we already committed the wallet update, we need to refund the user
-        await refundUser(userId, totalCost, 'Insufficient agent balance');
-        
-        return res.status(400).json({
-          status: 'error',
-          message: 'Service provider has insufficient balance for bulk purchase. Your wallet has been refunded.'
-        });
-      }
-      
-      // Prepare Geonettech API payload
-      const geonetOrderPayload = validatedOrders.map(order => ({
-        network_key: order.network,
-        ref: order.orderReference,
-        recipient: order.phoneNumber,
-        capacity: order.capacity
-      }));
-      
-      logOperation('GEONETTECH_BULK_ORDER_REQUEST', {
-        orderCount: geonetOrderPayload.length,
-        totalValue: totalCost
-      });
-      
-      // Send bulk request to Geonettech API
-      const geonetResponse = await geonetClient.post('/orders', geonetOrderPayload);
-      
-      logOperation('GEONETTECH_BULK_ORDER_RESPONSE', {
-        status: geonetResponse.status,
-        data: geonetResponse.data
-      });
-      
-      // Process the response and create records (outside of the MongoDB transaction)
-      const successfulOrders = geonetResponse.data.data.orders || [];
-      const failedOrders = geonetResponse.data.data.failed_orders || [];
-      const successfulRefs = new Set(successfulOrders.map(order => order.ref.toString()));
-      
-      // Track failed orders from the API response
-      const apiFailedOrders = [];
-      
-      // Map failed orders to a more useful format
-      failedOrders.forEach(failedOrder => {
-        apiFailedOrders.push({
-          phoneNumber: failedOrder.recipient,
-          network: failedOrder.network || network,
-          capacity: failedOrder.capacity,
-          reason: failedOrder.message || 'Order processing failed'
-        });
-      });
-      
-      // Create transaction and data purchase records
+
+      // Create transaction and data purchase records as PENDING
       const transactions = [];
       const dataPurchases = [];
-      let refundAmount = 0;
-      
+
       for (const order of validatedOrders) {
-        const isSuccessful = successfulRefs.has(order.orderReference.toString());
-        const status = isSuccessful ? 'completed' : 'failed';
-        
-        // Create transaction record
         const transaction = new Transaction({
           userId,
           type: 'purchase',
           amount: order.price,
-          status: 'completed', // We still complete the transaction
+          status: 'completed',
           reference: order.transactionReference,
           gateway: 'wallet'
         });
-        
-        // Create data purchase record
+
         const dataPurchase = new DataPurchase({
           userId,
           phoneNumber: order.phoneNumber,
@@ -330,20 +272,16 @@ router.post('/bulk-purchase-data', async (req, res) => {
           gateway: 'wallet',
           method: 'web',
           price: order.price,
-          status,
-          geonetReference: order.orderReference
+          status: 'pending',
+          geonetReference: order.orderReference,
+          processingMethod: 'datamart_api'
         });
-        
+
         transactions.push(transaction);
         dataPurchases.push(dataPurchase);
-        
-        // If order failed, track amount for refund
-        if (!isSuccessful) {
-          refundAmount += order.price;
-        }
       }
-      
-      // Save all transactions and data purchases without transaction
+
+      // Save all records
       for (const transaction of transactions) {
         await transaction.save();
       }
@@ -352,77 +290,57 @@ router.post('/bulk-purchase-data', async (req, res) => {
         await dataPurchase.save();
       }
       
-      // Refund failed orders if any
-      if (refundAmount > 0) {
-        await refundUser(userId, refundAmount, 'Partial refund for failed orders');
-        logOperation('PARTIAL_REFUND', {
-          userId,
-          refundAmount,
-          failedOrders: apiFailedOrders.length
-        });
-      }
-      
-      // Get updated user balance
-      const updatedUser = await User.findById(userId);
-      const finalBalance = updatedUser ? updatedUser.walletBalance : user.walletBalance;
-      
-      logOperation('BULK_PURCHASE_COMPLETED', {
+      logOperation('BULK_PURCHASE_SAVED_PENDING', {
         userId,
         totalCost,
         previousBalance,
-        newBalance: finalBalance,
-        totalOrders: validatedOrders.length,
-        successfulOrders: successfulRefs.size,
-        failedOrders: apiFailedOrders.length,
-        refundAmount
+        totalOrders: validatedOrders.length
       });
-      
-      // Prepare response
+
+      // Process each order via DataMart async (non-blocking)
+      for (const dp of dataPurchases) {
+        const dmNetwork = mapNetworkToDatamart(dp.network);
+        datamartClient.post('/api/developer/purchase', {
+          phoneNumber: dp.phoneNumber,
+          network: dmNetwork,
+          capacity: dp.capacity.toString(),
+          gateway: 'wallet',
+          ref: dp.geonetReference
+        }).then(response => {
+          if (response.data?.status === 'success') {
+            DataPurchase.findByIdAndUpdate(dp._id, {
+              status: 'processing',
+              apiOrderId: response.data.data?.purchaseId || dp.geonetReference,
+              apiResponse: response.data,
+              processingMethod: 'datamart_api'
+            }).catch(() => {});
+          }
+        }).catch(() => {});
+      }
+
+      const updatedUser = await User.findById(userId);
+      const finalBalance = updatedUser ? updatedUser.walletBalance : user.walletBalance;
+
       res.status(201).json({
         status: 'success',
-        message: 'Bulk data purchase processed',
+        message: `${validatedOrders.length} orders placed. Processing via DataMart.`,
         data: {
           totalOrders: orders.length,
           validOrders: validatedOrders.length,
-          successfulOrders: successfulRefs.size,
-          failedOrders: apiFailedOrders,
+          pendingOrders: validatedOrders.length,
           newWalletBalance: finalBalance,
           totalCost,
-          refundAmount,
           invalidOrders,
           duplicateNumbers,
-          recentlyPurchasedNumbers,
-          geonetechResponse: geonetResponse.data
+          recentlyPurchasedNumbers
         }
       });
-      
+
     } catch (apiError) {
-      // If the API call fails after we committed the transaction, refund the user
-      logOperation('GEONETTECH_API_ERROR', {
-        message: apiError.message,
-        response: apiError.response ? apiError.response.data : null
-      });
-      
-      await refundUser(userId, totalCost, 'Failed API call');
-      
-      // Extract specific error messages from the Geonettech response
-      let errorDetails = apiError.message;
-      let failedOrders = [];
-      
-      if (apiError.response && apiError.response.data) {
-        // Check if we have specific error details from Geonettech
-        if (apiError.response.data.data && apiError.response.data.data.failed_orders) {
-          failedOrders = apiError.response.data.data.failed_orders.map(order => ({
-            phoneNumber: order.recipient,
-            reason: order.message || 'Order processing failed',
-            network: order.network,
-            capacity: order.capacity
-          }));
-          
-          errorDetails = apiError.response.data.message || errorDetails;
-        }
-      }
-      
+      logOperation('BULK_PURCHASE_ERROR', { message: apiError.message });
+
+      await refundUser(userId, totalCost, 'Bulk purchase failed');
+
       return res.status(400).json({
         status: 'error',
         message: 'Failed to process bulk data purchase. Your wallet has been refunded.',

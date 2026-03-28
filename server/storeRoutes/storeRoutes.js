@@ -544,20 +544,19 @@ router.post('/webhook/paystack', async (req, res) => {
   }
 });
 
-// Process completed payment
+// Process completed payment — mark as paid, then try DataMart async
 async function processCompletedPayment(transaction, paystackData = null) {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
     // Mark as paid
     transaction.orderStatus = 'paid';
     transaction.paidAt = new Date();
-    await transaction.save({ session });
+    transaction.updatedAt = new Date();
+    await transaction.save();
 
-    // Fulfill the order via DataMart API
+    logOperation('PAYMENT_MARKED_PAID', { transactionId: transaction.transactionId });
+
+    // Try DataMart fulfillment (non-blocking — payment already saved)
     const datamartNetwork = mapNetworkForDatamart(transaction.network);
-
     const datamartPayload = {
       phoneNumber: transaction.recipientPhone,
       network: datamartNetwork,
@@ -568,71 +567,75 @@ async function processCompletedPayment(transaction, paystackData = null) {
 
     logOperation('DATAMART_STORE_REQUEST', datamartPayload);
 
-    let fulfillmentSuccess = false;
-    let datamartReference = null;
-
     try {
       const datamartResponse = await datamartClient.post('/api/developer/purchase', datamartPayload);
 
       if (datamartResponse.data && datamartResponse.data.status === 'success') {
-        fulfillmentSuccess = true;
-        datamartReference = datamartResponse.data.reference || datamartResponse.data.data?.reference;
+        // DataMart accepted — fulfill
+        const session = await mongoose.startSession();
+        session.startTransaction();
 
-        transaction.fulfillmentStatus = 'delivered';
-        transaction.datamartReference = datamartReference;
+        try {
+          transaction.orderStatus = 'completed';
+          transaction.fulfillmentStatus = 'delivered';
+          transaction.datamartReference = datamartResponse.data.reference || datamartResponse.data.data?.reference;
+          transaction.fulfillmentResponse = datamartResponse.data;
+          transaction.completedAt = new Date();
+          transaction.updatedAt = new Date();
+          await transaction.save({ session });
+
+          // Credit store wallet
+          await AgentStore.findByIdAndUpdate(
+            transaction.storeId,
+            {
+              $inc: {
+                'wallet.availableBalance': transaction.netProfit,
+                'wallet.totalEarnings': transaction.netProfit,
+                'stats.totalOrders': 1,
+                'stats.totalRevenue': transaction.sellingPrice
+              }
+            },
+            { session }
+          );
+
+          await AgentProduct.findByIdAndUpdate(
+            transaction.productId,
+            { $inc: { totalSold: 1 } },
+            { session }
+          );
+
+          const updatedStore = await AgentStore.findById(transaction.storeId).session(session);
+          await logWalletCredit(updatedStore, transaction, { session });
+
+          await session.commitTransaction();
+          logOperation('STORE_ORDER_COMPLETED', { transactionId: transaction.transactionId });
+        } catch (err) {
+          await session.abortTransaction();
+          throw err;
+        } finally {
+          session.endSession();
+        }
+      } else {
+        // DataMart rejected — stays as paid/processing for retry
+        transaction.orderStatus = 'processing';
+        transaction.fulfillmentStatus = 'pending';
         transaction.fulfillmentResponse = datamartResponse.data;
+        transaction.updatedAt = new Date();
+        await transaction.save();
+        logOperation('DATAMART_STORE_REJECTED', { transactionId: transaction.transactionId });
       }
     } catch (datamartError) {
-      logOperation('DATAMART_STORE_ERROR', { error: datamartError.message });
-      transaction.fulfillmentStatus = 'pending'; // Will retry later
+      // DataMart call failed — stays as processing for retry
+      transaction.orderStatus = 'processing';
+      transaction.fulfillmentStatus = 'pending';
       transaction.fulfillmentResponse = { error: datamartError.message };
+      transaction.updatedAt = new Date();
+      await transaction.save();
+      logOperation('DATAMART_STORE_ERROR', { transactionId: transaction.transactionId, error: datamartError.message });
     }
-
-    // Update order status
-    transaction.orderStatus = fulfillmentSuccess ? 'completed' : 'processing';
-    transaction.completedAt = fulfillmentSuccess ? new Date() : null;
-    transaction.updatedAt = new Date();
-    await transaction.save({ session });
-
-    // Credit store wallet if successful
-    if (fulfillmentSuccess) {
-      const store = await AgentStore.findById(transaction.storeId).session(session);
-
-      // Update wallet
-      await AgentStore.findByIdAndUpdate(
-        transaction.storeId,
-        {
-          $inc: {
-            'wallet.availableBalance': transaction.netProfit,
-            'wallet.totalEarnings': transaction.netProfit,
-            'stats.totalOrders': 1,
-            'stats.totalRevenue': transaction.sellingPrice
-          }
-        },
-        { session }
-      );
-
-      // Update product sold count
-      await AgentProduct.findByIdAndUpdate(
-        transaction.productId,
-        { $inc: { totalSold: 1 } },
-        { session }
-      );
-
-      // Log wallet credit
-      const updatedStore = await AgentStore.findById(transaction.storeId).session(session);
-      await logWalletCredit(updatedStore, transaction, { session });
-    }
-
-    await session.commitTransaction();
-    logOperation('PAYMENT_PROCESSED', { transactionId: transaction.transactionId, success: fulfillmentSuccess });
-
   } catch (error) {
-    await session.abortTransaction();
     logOperation('PROCESS_PAYMENT_ERROR', { transactionId: transaction.transactionId, error: error.message });
     throw error;
-  } finally {
-    session.endSession();
   }
 }
 
@@ -1077,6 +1080,143 @@ router.post('/stores/:storeSlug/orders/search', async (req, res) => {
     res.json({ status: 'success', data: { orders } });
   } catch (error) {
     res.status(500).json({ status: 'error', message: 'Failed to search orders' });
+  }
+});
+
+// =============================================================================
+// AGENT: VERIFY PAYMENT & RETRY FULFILLMENT
+// =============================================================================
+router.post('/stores/:storeId/orders/:transactionId/verify-and-retry', auth, verifyAgentOwnership, async (req, res) => {
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+
+    // Find the stuck order belonging to this store
+    const transaction = await AgentTransaction.findOneAndUpdate(
+      {
+        transactionId: req.params.transactionId,
+        storeId: req.params.storeId,
+        orderStatus: { $in: ['processing', 'paid'] }
+      },
+      { $set: { fulfillmentStatus: 'retrying' } },
+      { new: true, session }
+    );
+
+    if (!transaction) {
+      await session.abortTransaction();
+      return res.status(404).json({ status: 'error', message: 'Order not found or not eligible for retry' });
+    }
+
+    // Verify payment with Paystack first
+    let paymentVerified = false;
+    try {
+      const paystackRes = await paystackClient.get(`/transaction/verify/${transaction.transactionId}`);
+      if (paystackRes.data?.data?.status === 'success') {
+        paymentVerified = true;
+      }
+    } catch (err) {
+      // If Paystack verify fails, check if order was already marked paid
+      if (transaction.paidAt) {
+        paymentVerified = true;
+      }
+    }
+
+    if (!paymentVerified) {
+      transaction.fulfillmentStatus = 'pending';
+      await transaction.save({ session });
+      await session.commitTransaction();
+      return res.status(400).json({ status: 'error', message: 'Payment not confirmed by Paystack' });
+    }
+
+    // Mark as paid if not already
+    if (transaction.orderStatus !== 'paid' && !transaction.paidAt) {
+      transaction.orderStatus = 'paid';
+      transaction.paidAt = new Date();
+    }
+
+    // Retry DataMart fulfillment
+    const datamartPayload = {
+      phoneNumber: transaction.recipientPhone,
+      network: mapNetworkForDatamart(transaction.network),
+      capacity: transaction.capacity.toString(),
+      gateway: 'wallet',
+      ref: transaction.transactionId
+    };
+
+    logOperation('AGENT_RETRY_REQUEST', { agent: req.user._id, ...datamartPayload });
+
+    let fulfillmentSuccess = false;
+    let datamartResponse = null;
+
+    try {
+      const response = await datamartClient.post('/api/developer/purchase', datamartPayload);
+      datamartResponse = response.data;
+
+      if (datamartResponse && datamartResponse.status === 'success') {
+        fulfillmentSuccess = true;
+      }
+    } catch (datamartError) {
+      datamartResponse = { error: datamartError.message, response: datamartError.response?.data };
+    }
+
+    if (fulfillmentSuccess) {
+      transaction.orderStatus = 'completed';
+      transaction.fulfillmentStatus = 'delivered';
+      transaction.datamartReference = datamartResponse.reference || datamartResponse.data?.reference;
+      transaction.fulfillmentResponse = datamartResponse;
+      transaction.completedAt = new Date();
+      transaction.updatedAt = new Date();
+      await transaction.save({ session });
+
+      // Credit store wallet
+      await AgentStore.findByIdAndUpdate(
+        transaction.storeId,
+        {
+          $inc: {
+            'wallet.availableBalance': transaction.netProfit,
+            'wallet.totalEarnings': transaction.netProfit,
+            'stats.totalOrders': 1,
+            'stats.totalRevenue': transaction.sellingPrice
+          }
+        },
+        { session }
+      );
+
+      await AgentProduct.findByIdAndUpdate(
+        transaction.productId,
+        { $inc: { totalSold: 1 } },
+        { session }
+      );
+
+      const updatedStore = await AgentStore.findById(transaction.storeId).session(session);
+      await logWalletCredit(updatedStore, transaction, { session });
+
+      await session.commitTransaction();
+
+      res.json({
+        status: 'success',
+        message: 'Payment verified and order fulfilled',
+        data: { transactionId: transaction.transactionId, orderStatus: 'completed' }
+      });
+    } else {
+      transaction.fulfillmentStatus = 'pending';
+      transaction.fulfillmentResponse = datamartResponse;
+      transaction.updatedAt = new Date();
+      await transaction.save({ session });
+      await session.commitTransaction();
+
+      res.json({
+        status: 'failed',
+        message: 'Payment confirmed but data delivery failed. Try again shortly.',
+        data: { transactionId: transaction.transactionId, orderStatus: 'processing' }
+      });
+    }
+  } catch (error) {
+    if (session.inTransaction()) await session.abortTransaction();
+    logOperation('AGENT_RETRY_ERROR', { error: error.message });
+    res.status(500).json({ status: 'error', message: error.message });
+  } finally {
+    session.endSession();
   }
 });
 

@@ -70,7 +70,7 @@ export default function Withdrawals() {
                     {w.storeId?.storeName || 'Unknown Store'}
                   </p>
                   <p className={`text-sm ${dark ? 'text-gray-400' : 'text-gray-500'}`}>
-                    {w.agentId?.name} ({w.agentId?.phoneNumber})
+                    {w.storeId?.owner?.name} ({w.storeId?.owner?.phoneNumber})
                   </p>
                   <p className={`text-xs ${dark ? 'text-gray-500' : 'text-gray-400'}`}>
                     {fmt(w.createdAt)} | To: {w.momoNumber || w.accountNumber || 'N/A'} | {w.provider || w.gateway || 'N/A'}

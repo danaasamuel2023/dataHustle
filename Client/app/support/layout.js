@@ -40,9 +40,15 @@ export default function SupportLayout({ children }) {
     { name: 'Customer Search', href: '/support/customers', icon: '🔍' },
     { name: 'Failed Orders', href: '/support/failed-orders', icon: '❌' },
     { name: 'Deposits', href: '/support/deposits', icon: '💰' },
+    { name: 'Resolve Deposit', href: '/support/deposit-resolve', icon: '🔎' },
+    { name: 'All Orders', href: '/support/all-orders', icon: '📋' },
     { name: 'Reports & Tickets', href: '/support/reports', icon: '🎫' },
+    { name: 'Pending Users', href: '/support/pending-users', icon: '⏳' },
+    { name: 'Store Orders', href: '/support/store-orders', icon: '📦' },
     { name: 'Withdrawals', href: '/support/withdrawals', icon: '🏦' },
     { name: 'Agent Stores', href: '/support/stores', icon: '🏪' },
+    { name: 'Send SMS', href: '/support/send-sms', icon: '💬' },
+    { name: 'Audit Logs', href: '/support/audit-logs', icon: '📝' },
     { name: 'Team & Roles', href: '/support/team', icon: '👥' },
   ]
 

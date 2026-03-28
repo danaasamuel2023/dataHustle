@@ -31,11 +31,16 @@ const Footer = () => {
           {/* Company info */}
           <div className="lg:col-span-1">
             <div className="flex items-center gap-2.5 mb-4">
-              <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center">
-                <Zap className="w-5 h-5 text-white" strokeWidth={2.5} />
-              </div>
-              <span className="text-xl font-semibold text-white">
-                DATAHUSTLE
+              <svg width="36" height="36" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="40" height="40" rx="10" fill="#6366F1" />
+                <rect x="8" y="26" width="5" height="6" rx="1.5" fill="white" opacity="0.5" />
+                <rect x="15" y="20" width="5" height="12" rx="1.5" fill="white" opacity="0.7" />
+                <rect x="22" y="14" width="5" height="18" rx="1.5" fill="white" opacity="0.85" />
+                <rect x="29" y="8" width="5" height="24" rx="1.5" fill="white" />
+                <circle cx="31.5" cy="6" r="2" fill="white" opacity="0.6" />
+              </svg>
+              <span className="text-xl font-bold text-white tracking-tight">
+                Data<span className="text-indigo-300">Hustle</span>
               </span>
             </div>
             <p className="text-gray-400 text-sm leading-relaxed mb-6">

@@ -23,7 +23,8 @@ import {
   Receipt,
   Settings,
   HelpCircle,
-  Store
+  Store,
+  Wallet
 } from 'lucide-react';
 // Simple Success/Error Animation Components (no Lottie needed)
 const SuccessAnimation = () => (
@@ -372,6 +373,9 @@ const MobileNavbar = () => {
       items: [
         { icon: Home, text: 'Dashboard', path: '/', color: 'indigo' },
         { icon: Store, text: 'My Store', path: '/store', color: 'green' },
+        ...(userRole === 'admin' || userRole === 'worker' ? [
+          { icon: LayoutDashboard, text: 'Support Hub', path: '/support', color: 'blue' },
+        ] : []),
         ...(userRole === 'admin' ? [
           { icon: LayoutDashboard, text: 'Admin Users', path: '/admin', color: 'purple' },
           { icon: Store, text: 'Agent Stores', path: '/admin_stores', color: 'amber' }
@@ -389,6 +393,7 @@ const MobileNavbar = () => {
     {
       title: 'More Services',
       items: [
+        { icon: Wallet, text: 'Claim MoMo', path: '/claim-momo', color: 'green' },
         { icon: Smartphone, text: 'Foreign Numbers', path: '/verification-services', color: 'green', disabled: true },
         { icon: Receipt, text: 'Transaction History', path: '/myorders', color: 'slate' },
       ]
@@ -456,18 +461,39 @@ const MobileNavbar = () => {
       {/* Header - Indigo themed */}
       <header className="fixed top-0 left-0 right-0 h-16 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl z-50 border-b border-gray-200/50 dark:border-gray-800/50">
         <div className="flex items-center justify-between h-full px-4">
-          {/* Logo - Updated to Data Hustle with Indigo */}
+          {/* Logo */}
           <button onClick={() => router.push('/')} className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-indigo-500 flex items-center justify-center">
-              <span className="text-white font-black text-sm">DH</span>
-            </div>
-            <span className="text-xl font-bold text-gray-900 dark:text-white">
+            <svg width="36" height="36" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="40" height="40" rx="10" fill="#6366F1" />
+              <rect x="8" y="26" width="5" height="6" rx="1.5" fill="white" opacity="0.5" />
+              <rect x="15" y="20" width="5" height="12" rx="1.5" fill="white" opacity="0.7" />
+              <rect x="22" y="14" width="5" height="18" rx="1.5" fill="white" opacity="0.85" />
+              <rect x="29" y="8" width="5" height="24" rx="1.5" fill="white" />
+              <circle cx="31.5" cy="6" r="2" fill="white" opacity="0.6" />
+            </svg>
+            <span className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">
               Data<span className="text-indigo-500">Hustle</span>
             </span>
           </button>
 
           {/* Header Actions */}
           <div className="flex items-center gap-2">
+            {!isLoggedIn && (
+              <>
+                <button
+                  onClick={() => router.push('/buy')}
+                  className="px-3 py-1.5 text-sm font-medium text-indigo-500 hover:text-indigo-600 transition-colors"
+                >
+                  Buy Data
+                </button>
+                <button
+                  onClick={() => router.push('/SignIn')}
+                  className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                >
+                  Sign In
+                </button>
+              </>
+            )}
             {isLoggedIn && (
               <>
                 <button 
@@ -614,8 +640,15 @@ const MobileNavbar = () => {
           ) : (
             /* Logged Out State - Indigo themed */
             <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-              <div className="w-20 h-20 rounded-2xl bg-indigo-500 flex items-center justify-center mb-6">
-                <span className="text-white font-black text-2xl">DH</span>
+              <div className="mb-6">
+                <svg width="72" height="72" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="40" height="40" rx="10" fill="#6366F1" />
+                  <rect x="8" y="26" width="5" height="6" rx="1.5" fill="white" opacity="0.5" />
+                  <rect x="15" y="20" width="5" height="12" rx="1.5" fill="white" opacity="0.7" />
+                  <rect x="22" y="14" width="5" height="18" rx="1.5" fill="white" opacity="0.85" />
+                  <rect x="29" y="8" width="5" height="24" rx="1.5" fill="white" />
+                  <circle cx="31.5" cy="6" r="2" fill="white" opacity="0.6" />
+                </svg>
               </div>
               <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
                 Welcome to Data Hustle

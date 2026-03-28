@@ -19,30 +19,25 @@ const {
 // Constants
 const JWT_SECRET = process.env.JWT_SECRET || 'DatAmArt';
 
-const GEONETTECH_BASE_URL = 'https://posapi.geonettech.com/api/v1';
-const GEONETTECH_API_KEY = process.env.GEONETTECH_API_KEY || '21|rkrw7bcoGYjK8irAOTMaZ8sc1LRHYcwjuZnZmMNw4a6196f1';
+// ===== DATAMART API CONFIGURATION =====
+const DATAMART_BASE_URL = 'https://api.datamartgh.shop';
+const DATAMART_API_KEY = process.env.DATAMART_API_KEY || 'fb9b9e81e9640c1861605b4ec333e3bd57bdf70dcce461d766fa877c9c0f7553';
 
-// Add Telcel API constants
-const TELCEL_API_URL = 'https://iget.onrender.com/api/developer/orders';
-const TELCEL_API_KEY = process.env.TELCEL_API_KEY || 'b7975f5ce918b4a253a9c227f651339555094eaee8696ae168e195d09f74617f';
-
-// Create Geonettech client
-const geonetClient = axios.create({
-  baseURL: GEONETTECH_BASE_URL,
+const datamartClient = axios.create({
+  baseURL: DATAMART_BASE_URL,
   headers: {
-    'Authorization': `Bearer ${GEONETTECH_API_KEY}`,
+    'x-api-key': DATAMART_API_KEY,
     'Content-Type': 'application/json'
   }
 });
 
-// Create Telcel client
-const telcelClient = axios.create({
-  baseURL: TELCEL_API_URL,
-  headers: {
-    'X-API-Key': TELCEL_API_KEY,
-    'Content-Type': 'application/json'
-  }
-});
+const mapNetworkToDatamart = (network) => {
+  const networkMap = {
+    'TELECEL': 'TELECEL', 'MTN': 'YELLO', 'YELLO': 'YELLO',
+    'AIRTEL': 'at', 'AT': 'at', 'AT_PREMIUM': 'at', 'AIRTELTIGO': 'at', 'TIGO': 'at', 'at': 'at'
+  };
+  return networkMap[network?.toUpperCase()] || network;
+};
 
 const logOperation = (operation, data) => {
     const timestamp = new Date().toISOString();
@@ -104,28 +99,6 @@ const DATA_PACKAGES = [
 ];
 
 
-const checkAgentBalance = async () => {
-    try {
-        logOperation('AGENT_BALANCE_REQUEST', { timestamp: new Date() });
-        
-        const response = await geonetClient.get('/wallet/balance');
-        
-        logOperation('AGENT_BALANCE_RESPONSE', {
-            status: response.status,
-            data: response.data
-        });
-        
-        return parseFloat(response.data.data.balance.replace(/,/g, ''));
-    } catch (error) {
-        logOperation('AGENT_BALANCE_ERROR', {
-            message: error.message,
-            response: error.response ? error.response.data : null,
-            stack: error.stack
-        });
-        
-        throw new Error('Failed to fetch agent balance: ' + error.message);
-    }
-};
 // Authentication Middleware (JWT for web, keep for backward compatibility)
 // Modified authentication middleware to check multiple sources for the token
 const authenticateUser = async (req, res, next) => {
@@ -380,61 +353,6 @@ router.get('/data-packages', async (req, res) => {
 });
 
 // Helper function for Telecel API integration
-async function processTelecelOrder(recipient, capacity, reference) {
-    try {
-        logOperation('TELECEL_ORDER_REQUEST_PREPARED', {
-            recipient,
-            capacity,
-            reference
-        });
-        
-        // Format payload for Telecel API 
-        const telecelPayload = {
-            recipientNumber: recipient,
-            capacity: capacity, // Use GB for Telecel API
-            bundleType: "Telecel-5959", // Specific bundle type required for Telecel
-            reference: reference,
-        };
-        
-        logOperation('TELECEL_ORDER_REQUEST', telecelPayload);
-        
-        // Call Telecel API to process the order
-        const response = await axios.post(
-            'https://iget.onrender.com/api/developer/orders/place',
-            telecelPayload,
-            { 
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'X-API-Key': TELCEL_API_KEY
-                } 
-            }
-        );
-        
-        logOperation('TELECEL_ORDER_RESPONSE', response.data);
-        
-        return {
-            success: true,
-            data: response.data,
-            orderId: response.data.orderReference || response.data.transactionId || response.data.id || reference
-        };
-    } catch (error) {
-        logOperation('TELECEL_ORDER_ERROR', {
-            message: error.message,
-            status: error.response?.status,
-            statusText: error.response?.statusText,
-            data: error.response?.data
-        });
-        
-        return {
-            success: false,
-            error: {
-                message: error.message,
-                details: error.response?.data || 'No response details available'
-            }
-        };
-    }
-}
-
 router.post('/purchase', async (req, res, next) => {
     // First try API key authentication
     const apiKey = req.headers['x-api-key'];
@@ -544,584 +462,86 @@ router.post('/purchase', async (req, res, next) => {
 
         // Generate unique references
         const transactionReference = `TRX-${uuidv4()}`;
-        const orderReference = Math.floor(1000 + Math.random() * 900000); // Generates a number between 1000 and 9999
+        const orderReference = `DM-${Math.floor(100000 + Math.random() * 900000)}`;
 
-        // Create Transaction
+        // Create Transaction (wallet deduction)
+        // Save order as PENDING — queue processor sends to DataMart
         const transaction = new Transaction({
             userId: req.user._id,
             type: 'purchase',
             amount: price,
-            status: 'completed', // Transaction is always completed (money deducted)
+            status: 'completed',
             reference: transactionReference,
             gateway
         });
 
-        // PROCESSING SECTION
-        let orderResponse = null;
-        let apiOrderId = null;
-        let orderStatus = 'completed'; // Default status
-        
-        // Check if we should skip API calls (from inventory state)
-        const shouldSkipApi = inventory.skipGeonettech && (network !== 'TELECEL');
-        
-        logOperation('API_PROCESSING_DECISION', {
+        const dataPurchase = new DataPurchase({
+            userId: req.user._id,
+            phoneNumber,
             network,
-            skipGeonettech: inventory.skipGeonettech,
-            shouldSkipApi,
-            reason: shouldSkipApi 
-                ? 'API disabled for this network' 
-                : 'Normal API processing'
+            capacity,
+            mb: dataPackage.mb,
+            gateway,
+            method: 'api',
+            price,
+            status: 'pending',
+            geonetReference: orderReference,
+            processingMethod: 'datamart_api'
         });
 
-        // If network is AT_PREMIUM, route to Hubnet instead of Geonettech
-        if (network === 'at') {
-            if (shouldSkipApi) {
-                // Skip Hubnet API - store as pending
-                logOperation('SKIPPING_HUBNET_API', {
-                    network,
-                    phoneNumber,
-                    capacity,
-                    orderReference,
-                    reason: 'API disabled for this network'
-                });
-                
-                orderStatus = 'pending';
-                apiOrderId = orderReference;
-                orderResponse = {
-                    status: 'pending',
-                    message: 'Order stored as pending - Hubnet API disabled',
-                    reference: orderReference,
-                    skipReason: 'API disabled for network'
-                };
-            } else {
-                // Convert data amount from GB to MB for Hubnet API
-                const volumeInMB = parseFloat(capacity) * 1000;
+        const previousBalance = req.user.walletBalance;
+        req.user.walletBalance -= price;
+        transaction.relatedPurchaseId = dataPurchase._id;
 
-                // Get network code for Hubnet - for AT_PREMIUM, it should be 'at'
-                const networkCode = 'at';
+        await dataPurchase.save({ session });
+        await transaction.save({ session });
+        await req.user.save({ session });
 
-                logOperation('HUBNET_ORDER_REQUEST_PREPARED', {
-                    networkCode,
-                    phoneNumber,
-                    volumeInMB,
-                    reference: orderReference,
-                    referrer: referrerNumber || phoneNumber,
-                    timestamp: new Date()
-                });
+        await session.commitTransaction();
+        session.endSession();
 
-                try {
-                    // Make request to Hubnet API
-                    const hubnetResponse = await fetch(`https://console.hubnet.app/live/api/context/business/transaction/${networkCode}-new-transaction`, {
-                        method: 'POST',
-                        headers: {
-                            'token': 'Bearer KN5CxVxXYWCrKDyHBOwvNj1gbMSiWTw5FL5',
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            phone: phoneNumber,
-                            volume: volumeInMB,
-                            reference: orderReference,
-                            referrer: referrerNumber || phoneNumber,
-                            webhook: ''
-                        })
-                    });
+        logOperation('DATA_PURCHASE_SAVED_PENDING', {
+            userId: req.user._id,
+            orderReference, network, capacity,
+            previousBalance, newBalance: req.user.walletBalance
+        });
 
-                    const hubnetData = await hubnetResponse.json();
-
-                    logOperation('HUBNET_ORDER_RESPONSE', {
-                        status: hubnetResponse.status,
-                        ok: hubnetResponse.ok,
-                        data: hubnetData,
-                        timestamp: new Date()
-                    });
-
-                    if (!hubnetResponse.ok) {
-                        logOperation('HUBNET_ORDER_FAILED', {
-                            error: hubnetData.message || 'Unknown error',
-                            status: hubnetResponse.status
-                        });
-                        
-                        await session.abortTransaction();
-                        session.endSession();
-                        
-                        return res.status(400).json({
-                            status: 'error',
-                            message: hubnetData.message || 'Could not complete your purchase. Please try again later.'
-                        });
-                    }
-
-                    // Update status if successful
-                    orderStatus = 'completed';
-                    orderResponse = hubnetData;
-                    apiOrderId = orderReference;
-                    
-                } catch (hubnetError) {
-                    logOperation('HUBNET_API_EXCEPTION', {
-                        error: hubnetError.message,
-                        stack: hubnetError.stack,
-                        orderReference
-                    });
-                    
-                    await session.abortTransaction();
-                    session.endSession();
-                    
-                    return res.status(400).json({
-                        status: 'error',
-                        message: 'Unable to process your order. Please try again later.'
-                    });
-                }
+        // Process via DataMart async (non-blocking)
+        const datamartNetwork = mapNetworkToDatamart(network);
+        datamartClient.post('/api/developer/purchase', {
+            phoneNumber,
+            network: datamartNetwork,
+            capacity: capacity.toString(),
+            gateway: 'wallet',
+            ref: orderReference
+        }).then(response => {
+            if (response.data?.status === 'success') {
+                DataPurchase.findByIdAndUpdate(dataPurchase._id, {
+                    status: 'processing',
+                    apiOrderId: response.data.data?.purchaseId || orderReference,
+                    apiResponse: response.data,
+                    processingMethod: 'datamart_api'
+                }).catch(err => logOperation('DB_UPDATE_ERROR', { error: err.message }));
             }
+        }).catch(err => {
+            logOperation('ASYNC_DATAMART_ERROR', { orderId: dataPurchase._id, error: err.message });
+        });
 
-            // Create Data Purchase with Hubnet reference
-            const dataPurchase = new DataPurchase({
-                userId: req.user._id,
-                phoneNumber,
+        res.status(201).json({
+            status: 'success',
+            message: 'Order placed successfully. Processing your data bundle.',
+            data: {
+                purchaseId: dataPurchase._id,
+                transactionReference: transaction.reference,
                 network,
                 capacity,
                 mb: dataPackage.mb,
-                gateway,
-                method: 'api',
                 price,
-                status: orderStatus,
-                hubnetReference: orderReference,
-                referrerNumber: referrerNumber || null,
-                geonetReference: orderReference, // Keep this for compatibility
-                apiResponse: orderResponse,
-                skipGeonettech: shouldSkipApi // Track if API was skipped
-            });
-
-            // Deduct wallet balance
-            const previousBalance = req.user.walletBalance;
-            req.user.walletBalance -= price;
-
-            logOperation('USER_WALLET_UPDATE', {
-                userId: req.user._id,
-                previousBalance,
-                newBalance: req.user.walletBalance,
-                deduction: price
-            });
-
-            // Save entities to database
-            await dataPurchase.save({ session });
-            await transaction.save({ session });
-            await req.user.save({ session });
-
-            // Commit transaction
-            await session.commitTransaction();
-            session.endSession();
-
-            // Prepare response message based on order status
-            let responseMessage = 'Data bundle purchased successfully';
-            if (orderStatus === 'pending') {
-                responseMessage = 'Order placed successfully and is pending processing';
-            }
-
-            logOperation('DATA_PURCHASE_SUCCESS', {
-                userId: req.user._id,
-                orderStatus,
-                orderReference,
-                skipApi: shouldSkipApi,
-                newWalletBalance: req.user.walletBalance
-            });
-
-            res.status(201).json({
-                status: 'success',
-                message: responseMessage,
-                data: {
-                    purchaseId: dataPurchase._id,
-                    transactionReference: transaction.reference,
-                    network,
-                    capacity,
-                    mb: dataPackage.mb,
-                    price,
-                    remainingBalance: req.user.walletBalance,
-                    orderStatus: orderStatus,
-                    skipApi: shouldSkipApi,
-                    hubnetResponse: orderResponse
-                }
-            });
-
-        } else if (network === 'TELECEL') {
-            // Always use Telecel API for Telecel network (never skip)
-            logOperation('USING_TELECEL_API', {
-                network,
-                phoneNumber,
-                capacity,
+                remainingBalance: req.user.walletBalance,
+                orderStatus: 'pending',
                 orderReference
-            });
-            
-            // Try to process the Telecel order
-            const telecelResponse = await processTelecelOrder(phoneNumber, capacity, orderReference);
-            
-            // If the API call failed, abort the transaction and return error
-            if (!telecelResponse.success) {
-                logOperation('TELECEL_API_ERROR', {
-                    error: telecelResponse.error,
-                    orderReference
-                });
-                
-                await session.abortTransaction();
-                session.endSession();
-                
-                // Extract the exact error message from Telecel if available
-                let errorMessage = 'Could not complete your purchase. Please try again later.';
-                
-                if (telecelResponse.error && telecelResponse.error.message) {
-                    errorMessage = telecelResponse.error.message;
-                }
-                
-                if (telecelResponse.error && telecelResponse.error.details && 
-                    typeof telecelResponse.error.details === 'object' && 
-                    telecelResponse.error.details.message) {
-                    errorMessage = telecelResponse.error.details.message;
-                }
-                
-                return res.status(400).json({
-                    status: 'error',
-                    message: errorMessage
-                });
             }
-            
-            // If we got here, the API call succeeded
-            orderResponse = telecelResponse.data;
-            orderStatus = 'completed';
-            
-            // Extract order ID if available
-            if (telecelResponse.data && 
-                telecelResponse.data.data && 
-                telecelResponse.data.data.order && 
-                telecelResponse.data.data.order.orderReference) {
-                apiOrderId = telecelResponse.data.data.order.orderReference;
-            } else {
-                apiOrderId = telecelResponse.orderId || orderReference;
-            }
-            
-            logOperation('TELECEL_ORDER_SUCCESS', {
-                orderId: apiOrderId,
-                orderReference
-            });
-
-            // Create Data Purchase with reference
-            const dataPurchase = new DataPurchase({
-                userId: req.user._id,
-                phoneNumber,
-                network,
-                capacity,
-                mb: dataPackage.mb,
-                gateway,
-                method: 'api',
-                price,
-                status: orderStatus,
-                geonetReference: orderReference,
-                apiOrderId: apiOrderId,
-                apiResponse: orderResponse,
-                skipGeonettech: false // Never skip for TELECEL
-            });
-
-            // Deduct wallet balance
-            const previousBalance = req.user.walletBalance;
-            req.user.walletBalance -= price;
-
-            logOperation('USER_WALLET_UPDATE', {
-                userId: req.user._id,
-                previousBalance,
-                newBalance: req.user.walletBalance,
-                deduction: price
-            });
-
-            // Save entities to database
-            await dataPurchase.save({ session });
-            await transaction.save({ session });
-            await req.user.save({ session });
-
-            // Commit transaction
-            await session.commitTransaction();
-            session.endSession();
-
-            logOperation('DATA_PURCHASE_SUCCESS', {
-                userId: req.user._id,
-                orderStatus,
-                orderReference,
-                newWalletBalance: req.user.walletBalance
-            });
-
-            res.status(201).json({
-                status: 'success',
-                message: 'Data bundle purchased successfully',
-                data: {
-                    purchaseId: dataPurchase._id,
-                    transactionReference: transaction.reference,
-                    network,
-                    capacity,
-                    mb: dataPackage.mb,
-                    price,
-                    remainingBalance: req.user.walletBalance,
-                    orderStatus: orderStatus,
-                    telecelResponse: orderResponse
-                }
-            });
-
-        } else if (shouldSkipApi) {
-            // Skip Geonettech API - store as pending
-            logOperation('SKIPPING_GEONETTECH_API', {
-                network,
-                phoneNumber,
-                capacity,
-                orderReference,
-                reason: 'Geonettech API disabled for this network'
-            });
-            
-            orderStatus = 'pending';
-            apiOrderId = orderReference;
-            orderResponse = {
-                status: 'pending',
-                message: 'Order stored as pending - Geonettech API disabled',
-                reference: orderReference,
-                skipReason: 'API disabled for network'
-            };
-
-            // Create Data Purchase with reference
-            const dataPurchase = new DataPurchase({
-                userId: req.user._id,
-                phoneNumber,
-                network,
-                capacity,
-                mb: dataPackage.mb,
-                gateway,
-                method: 'api',
-                price,
-                status: orderStatus,
-                geonetReference: orderReference,
-                apiOrderId: apiOrderId,
-                apiResponse: orderResponse,
-                skipGeonettech: true // Track that API was skipped
-            });
-
-            // Deduct wallet balance
-            const previousBalance = req.user.walletBalance;
-            req.user.walletBalance -= price;
-
-            logOperation('USER_WALLET_UPDATE', {
-                userId: req.user._id,
-                previousBalance,
-                newBalance: req.user.walletBalance,
-                deduction: price
-            });
-
-            // Save entities to database
-            await dataPurchase.save({ session });
-            await transaction.save({ session });
-            await req.user.save({ session });
-
-            // Commit transaction
-            await session.commitTransaction();
-            session.endSession();
-
-            logOperation('DATA_PURCHASE_SUCCESS', {
-                userId: req.user._id,
-                orderStatus,
-                orderReference,
-                skipGeonettech: true,
-                newWalletBalance: req.user.walletBalance
-            });
-
-            res.status(201).json({
-                status: 'success',
-                message: 'Order placed successfully and is pending processing',
-                data: {
-                    purchaseId: dataPurchase._id,
-                    transactionReference: transaction.reference,
-                    network,
-                    capacity,
-                    mb: dataPackage.mb,
-                    price,
-                    remainingBalance: req.user.walletBalance,
-                    orderStatus: orderStatus,
-                    skipGeonettech: true
-                }
-            });
-
-        } else {
-            // For YELLO network, use Geonettech API normally
-            try {
-                // Check agent wallet balance (only needed for Geonettech)
-                const agentBalance = await checkAgentBalance();
-                
-                logOperation('AGENT_BALANCE_RESULT', {
-                    balance: agentBalance,
-                    requiredAmount: price,
-                    sufficient: agentBalance >= price
-                });
-                
-                if (agentBalance < price) {
-                    logOperation('AGENT_INSUFFICIENT_BALANCE', {
-                        agentBalance,
-                        requiredAmount: price
-                    });
-                    
-                    await session.abortTransaction();
-                    session.endSession();
-                    
-                    return res.status(400).json({
-                        status: 'error',
-                        message: 'Service provider out of stock'
-                    });
-                }
-
-                // Place order with Geonettech
-                logOperation('GEONETTECH_ORDER_REQUEST_PREPARED', {
-                    network_key: network,
-                    ref: orderReference,
-                    recipient: phoneNumber,
-                    capacity: capacity,
-                    timestamp: new Date()
-                });
-
-                const geonetOrderPayload = [{
-                    network_key: network,
-                    ref: orderReference,
-                    recipient: phoneNumber,
-                    capacity: capacity
-                }];
-                
-                logOperation('GEONETTECH_ORDER_REQUEST', geonetOrderPayload);
-                
-                const geonetResponse = await geonetClient.post('/orders', geonetOrderPayload);
-                
-                logOperation('GEONETTECH_ORDER_RESPONSE', {
-                    status: geonetResponse.status,
-                    statusText: geonetResponse.statusText,
-                    headers: geonetResponse.headers,
-                    data: geonetResponse.data,
-                    timestamp: new Date()
-                });
-
-                // Check if the response indicates success
-                if (!geonetResponse.data || !geonetResponse.data.status || geonetResponse.data.status !== 'success') {
-                    logOperation('GEONETTECH_API_UNSUCCESSFUL_RESPONSE', {
-                        response: geonetResponse.data,
-                        orderReference
-                    });
-                    
-                    await session.abortTransaction();
-                    session.endSession();
-                    
-                    // Extract the message but don't expose API details
-                    let errorMessage = 'Could not complete your purchase. Please try again later.';
-                    
-                    if (geonetResponse.data && geonetResponse.data.message) {
-                        const msg = geonetResponse.data.message.toLowerCase();
-                        
-                        if (msg.includes('duplicate') || msg.includes('within 5 minutes')) {
-                            errorMessage = 'A similar order was recently placed. Please wait a few minutes before trying again.';
-                        } else if (msg.includes('invalid') || msg.includes('phone')) {
-                            errorMessage = 'The phone number you entered appears to be invalid. Please check and try again.';
-                        } else {
-                            errorMessage = geonetResponse.data.message;
-                        }
-                    }
-                    
-                    return res.status(400).json({
-                        status: 'error',
-                        message: errorMessage
-                    });
-                }
-
-                // Update status if successful
-                orderStatus = 'completed';
-                orderResponse = geonetResponse.data;
-                apiOrderId = orderResponse.data ? orderResponse.data.orderId : orderReference;
-                
-                logOperation('GEONETTECH_ORDER_SUCCESS', {
-                    orderId: apiOrderId,
-                    responseData: orderResponse
-                });
-
-            } catch (apiError) {
-                // Log the error and abort transaction
-                logOperation('GEONETTECH_API_ERROR', {
-                    error: apiError.message,
-                    response: apiError.response ? apiError.response.data : null,
-                    orderReference
-                });
-                
-                await session.abortTransaction();
-                session.endSession();
-                
-                // Just pass through the exact error message from the API without any modification
-                let errorMessage = 'Could not complete your purchase. Please try again later.';
-                
-                // If there's a specific message from the API, use it directly
-                if (apiError.response && apiError.response.data && apiError.response.data.message) {
-                    errorMessage = apiError.response.data.message;
-                }
-                
-                return res.status(400).json({
-                    status: 'error',
-                    message: errorMessage
-                });
-            }
-
-            // Create Data Purchase with reference
-            const dataPurchase = new DataPurchase({
-                userId: req.user._id,
-                phoneNumber,
-                network,
-                capacity,
-                mb: dataPackage.mb,
-                gateway,
-                method: 'api',
-                price,
-                status: orderStatus,
-                geonetReference: orderReference,
-                apiOrderId: apiOrderId,
-                apiResponse: orderResponse,
-                skipGeonettech: false // Normal API processing
-            });
-
-            // Deduct wallet balance
-            const previousBalance = req.user.walletBalance;
-            req.user.walletBalance -= price;
-
-            logOperation('USER_WALLET_UPDATE', {
-                userId: req.user._id,
-                previousBalance,
-                newBalance: req.user.walletBalance,
-                deduction: price
-            });
-
-            // Save entities to database
-            await dataPurchase.save({ session });
-            await transaction.save({ session });
-            await req.user.save({ session });
-
-            // Commit transaction
-            await session.commitTransaction();
-            session.endSession();
-
-            logOperation('DATA_PURCHASE_SUCCESS', {
-                userId: req.user._id,
-                orderStatus,
-                orderReference,
-                newWalletBalance: req.user.walletBalance
-            });
-
-            res.status(201).json({
-                status: 'success',
-                message: 'Data bundle purchased successfully',
-                data: {
-                    purchaseId: dataPurchase._id,
-                    transactionReference: transaction.reference,
-                    network,
-                    capacity,
-                    mb: dataPackage.mb,
-                    price,
-                    remainingBalance: req.user.walletBalance,
-                    orderStatus: orderStatus,
-                    geonetechResponse: orderResponse
-                }
-            });
-        }
+        });
 
     } catch (error) {
         // Rollback transaction

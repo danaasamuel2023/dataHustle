@@ -12,7 +12,7 @@ const authRouter = require('./AuthRoutes/Auth.js').router;
 const dataOrderRoutes = require('./orderRou/order.js');
 const Deposit = require('./DepositeRoutes/UserDeposite.js');
 const Developer = require('./ResellerApi/resellerApi.js')
-const HubnetAt = require('./HubnetInteraction/hubnet.js');
+const axios = require('axios');
 const AdminManagement = require('./admin-management/adminManagemet.js')
 const passreset = require('./ResetPasword/reset.js')
 const Report = require('./Reporting/reporting.js')
@@ -57,7 +57,7 @@ app.use('/api', sms);
 app.use('/api/v1/data', dataOrderRoutes);
 app.use('/api/v1', Deposit);
 app.use('/api/developer', Developer)
-app.use('/api/v1', HubnetAt);
+// Hubnet removed — all orders go through DataMart
 app.use('/api',AdminManagement)
 app.use('/api/v1', passreset);
 app.use('/api/reports', Report);
@@ -109,9 +109,25 @@ setInterval(async () => {
   }
 }, 10000);
 
+// =============================================================================
+// PENDING ORDER PROCESSOR
+// Runs every 30 seconds to process pending orders via DataMart API
+// =============================================================================
+setInterval(async () => {
+  try {
+    const res = await axios.post(`http://localhost:${process.env.PORT || 5000}/api/v1/data/process-pending-orders`);
+    if (res.data?.data?.success > 0 || res.data?.data?.failed > 0) {
+      console.log(`[ORDER_QUEUE] Processed: ${res.data.data.success} success, ${res.data.data.failed} failed`);
+    }
+  } catch (error) {
+    // Silently ignore — orders will be retried next cycle
+  }
+}, 30000);
+
 // Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`[PAYSTACK_QUEUE] Queue processor started (every 10s)`);
+  console.log(`[ORDER_QUEUE] Pending order processor started (every 30s)`);
 });

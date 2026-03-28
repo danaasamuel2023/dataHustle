@@ -61,24 +61,21 @@ export default function LoginClient() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-8 transition-colors bg-gray-100 dark:bg-gray-900">
-      {/* Theme Toggle */}
-      <button
-        onClick={toggleDarkMode}
-        className={`fixed top-4 right-4 p-2.5 rounded-lg transition-colors z-40 ${
-          mounted && darkMode
-            ? 'bg-gray-800 text-yellow-400 hover:bg-gray-700'
-            : 'bg-white text-gray-700 hover:bg-gray-50 shadow-md'
-        }`}
-        aria-label="Toggle theme"
-      >
-        {mounted && darkMode ? <Sun size={20} /> : <Moon size={20} />}
-      </button>
-
       <div className="w-full max-w-sm">
         {/* Logo & Tagline */}
-        <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-indigo-500">DATA HUSTLE</h1>
-          <p className="text-sm mt-1 text-gray-600 dark:text-gray-400">
+        <div className="flex flex-col items-center mb-6">
+          <svg width="48" height="48" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="mb-3">
+            <rect width="40" height="40" rx="10" fill="#6366F1" />
+            <rect x="8" y="26" width="5" height="6" rx="1.5" fill="white" opacity="0.5" />
+            <rect x="15" y="20" width="5" height="12" rx="1.5" fill="white" opacity="0.7" />
+            <rect x="22" y="14" width="5" height="18" rx="1.5" fill="white" opacity="0.85" />
+            <rect x="29" y="8" width="5" height="24" rx="1.5" fill="white" />
+            <circle cx="31.5" cy="6" r="2" fill="white" opacity="0.6" />
+          </svg>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+            Data<span className="text-indigo-500">Hustle</span>
+          </h1>
+          <p className="text-sm mt-1 text-gray-500 dark:text-gray-400">
             Ghana's Data Marketplace
           </p>
         </div>
@@ -102,7 +99,7 @@ export default function LoginClient() {
         </div>
 
         {/* Main Card */}
-        <div className="rounded-2xl shadow-lg overflow-hidden bg-white dark:bg-gray-800">
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800">
           <div className="p-6">
             <h2 className="text-xl font-bold mb-1 text-gray-900 dark:text-white">
               Welcome back
