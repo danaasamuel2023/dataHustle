@@ -6,8 +6,8 @@ import { Package, Moon, Sun, AlertCircle, XCircle, Shield, User, Clock, Search, 
 
 // ===== DATA HUSTLE CONFIGURATION =====
 // Uses same backend and store as DataMart, but with 'datahustle' platform
-const API_BASE = 'https://api.datamartgh.shop/api/v1';
-const API_BASE_V0 = 'https://api.datamartgh.shop/api';
+const API_BASE = '/api/proxy/v1';
+const API_BASE_V0 = '/api/proxy';
 const STORE_NAME = 'sam-1756835542914'; // Same store as DataMart
 const WHATSAPP_CHANNEL = 'https://whatsapp.com/channel/0029Vb6zDvaGzzKTwCWszC1Z';
 const PLATFORM_NAME = 'Data Hustle';

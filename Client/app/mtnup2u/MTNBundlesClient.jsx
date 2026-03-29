@@ -325,7 +325,7 @@ const MTNBundlesClient = () => {
     setIsLoading(true);
     try {
       const STORE_SLUG = 'sam-1756835542914';
-      const STORE_API = 'https://api.datamartgh.shop/api/v1/agent-stores';
+      const STORE_API = '/api/proxy/v1/agent-stores';
 
       // Fetch store products to find matching productId
       const productsRes = await axios.get(`${STORE_API}/stores/${STORE_SLUG}/products`);
