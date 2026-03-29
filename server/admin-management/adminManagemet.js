@@ -1899,4 +1899,144 @@ router.put('/admin/guest-orders/:id/status', auth, adminAuth, async (req, res) =
   }
 });
 
+// ===== PROCESSOR DASHBOARD =====
+router.get('/admin/processor-dashboard', auth, adminAuth, async (req, res) => {
+  try {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const last1h = new Date(now - 60 * 60 * 1000);
+    const last24h = new Date(now - 24 * 60 * 60 * 1000);
+
+    // Wallet orders (DataPurchase) stats
+    const [walletStats, walletToday, walletLast1h] = await Promise.all([
+      DataPurchase.aggregate([
+        { $group: { _id: '$status', count: { $sum: 1 } } }
+      ]),
+      DataPurchase.aggregate([
+        { $match: { createdAt: { $gte: today } } },
+        { $group: { _id: '$status', count: { $sum: 1 } } }
+      ]),
+      DataPurchase.aggregate([
+        { $match: { createdAt: { $gte: last1h } } },
+        { $group: { _id: '$status', count: { $sum: 1 } } }
+      ])
+    ]);
+
+    // Guest orders stats
+    const [guestStats, guestToday, guestLast1h] = await Promise.all([
+      GuestOrder.aggregate([
+        { $group: {
+          _id: { paymentStatus: '$paymentStatus', orderStatus: '$orderStatus' },
+          count: { $sum: 1 }
+        }}
+      ]),
+      GuestOrder.aggregate([
+        { $match: { createdAt: { $gte: today } } },
+        { $group: {
+          _id: { paymentStatus: '$paymentStatus', orderStatus: '$orderStatus' },
+          count: { $sum: 1 }
+        }}
+      ]),
+      GuestOrder.aggregate([
+        { $match: { createdAt: { $gte: last1h } } },
+        { $group: {
+          _id: { paymentStatus: '$paymentStatus', orderStatus: '$orderStatus' },
+          count: { $sum: 1 }
+        }}
+      ])
+    ]);
+
+    // Network breakdown for pending orders
+    const [walletPendingByNetwork, guestPendingByNetwork] = await Promise.all([
+      DataPurchase.aggregate([
+        { $match: { status: { $in: ['pending', 'processing'] } } },
+        { $group: { _id: '$network', count: { $sum: 1 } } }
+      ]),
+      GuestOrder.aggregate([
+        { $match: { orderStatus: { $in: ['pending', 'processing'] }, paymentStatus: 'paid' } },
+        { $group: { _id: '$network', count: { $sum: 1 } } }
+      ])
+    ]);
+
+    // Recent orders (last 20 across both types)
+    const [recentWallet, recentGuest] = await Promise.all([
+      DataPurchase.find()
+        .sort({ createdAt: -1 })
+        .limit(15)
+        .select('phoneNumber network capacity price status geonetReference processingMethod createdAt updatedAt')
+        .lean(),
+      GuestOrder.find()
+        .sort({ createdAt: -1 })
+        .limit(15)
+        .select('reference recipientPhone network capacity price paymentStatus orderStatus createdAt updatedAt paidAt')
+        .lean()
+    ]);
+
+    // Stuck orders (pending for more than 5 minutes)
+    const fiveMinAgo = new Date(now - 5 * 60 * 1000);
+    const [stuckWallet, stuckGuest] = await Promise.all([
+      DataPurchase.find({ status: 'pending', createdAt: { $lt: fiveMinAgo } })
+        .sort({ createdAt: 1 })
+        .limit(20)
+        .select('phoneNumber network capacity price status geonetReference createdAt apiResponse')
+        .lean(),
+      GuestOrder.find({ paymentStatus: 'paid', orderStatus: 'pending', paidAt: { $lt: fiveMinAgo } })
+        .sort({ createdAt: 1 })
+        .limit(20)
+        .select('reference recipientPhone network capacity price orderStatus createdAt paidAt')
+        .lean()
+    ]);
+
+    // Inventory status
+    const inventory = await DataInventory.find().lean();
+
+    // Helper to convert aggregation to object
+    const toObj = (arr) => {
+      const obj = {};
+      arr.forEach(item => { obj[item._id] = item.count; });
+      return obj;
+    };
+
+    const guestToObj = (arr) => {
+      const obj = {};
+      arr.forEach(item => {
+        const key = `${item._id.paymentStatus}_${item._id.orderStatus}`;
+        obj[key] = item.count;
+      });
+      return obj;
+    };
+
+    res.json({
+      status: 'success',
+      data: {
+        wallet: {
+          all: toObj(walletStats),
+          today: toObj(walletToday),
+          last1h: toObj(walletLast1h),
+          pendingByNetwork: toObj(walletPendingByNetwork),
+          recent: recentWallet,
+          stuck: stuckWallet
+        },
+        guest: {
+          all: guestToObj(guestStats),
+          today: guestToObj(guestToday),
+          last1h: guestToObj(guestLast1h),
+          pendingByNetwork: toObj(guestPendingByNetwork),
+          recent: recentGuest,
+          stuck: stuckGuest
+        },
+        inventory: inventory.map(i => ({
+          network: i.network,
+          inStock: i.inStock,
+          skipGeonettech: i.skipGeonettech
+        })),
+        serverTime: now
+      }
+    });
+  } catch (err) {
+    console.error('Processor dashboard error:', err.message);
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
 module.exports = router;
