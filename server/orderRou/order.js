@@ -216,7 +216,20 @@ function generateMixedReference(prefix = '') {
 
 // ===== DATAMART ORDER PROCESSOR =====
 // Process a pending order via DataMart API (used by queue processor and retry)
-async function processOrderViaDatamart(order) {
+async function processOrderViaDatamart(orderOrId) {
+  // Re-fetch from DB to avoid stale document issues after transactions
+  const order = await DataPurchase.findById(orderOrId._id || orderOrId);
+  if (!order) {
+    logOperation('DATAMART_PROCESS_ORDER_NOT_FOUND', { orderId: orderOrId._id || orderOrId });
+    return { success: false, error: 'Order not found' };
+  }
+
+  // Skip if already in a final state
+  if (['completed', 'failed', 'refunded', 'delivered'].includes(order.status)) {
+    logOperation('DATAMART_PROCESS_SKIP_FINAL', { orderId: order._id, status: order.status });
+    return { success: false, error: 'Order already in final state' };
+  }
+
   const datamartNetwork = mapNetworkToDatamart(order.network);
   const datamartPayload = {
     phoneNumber: order.phoneNumber,
@@ -232,26 +245,19 @@ async function processOrderViaDatamart(order) {
     const response = await datamartClient.post('/api/developer/purchase', datamartPayload);
 
     if (response.data && response.data.status === 'success') {
-      order.status = 'processing'; // DataMart accepted, will deliver
-      order.apiOrderId = response.data.data?.purchaseId || order.geonetReference;
-      order.apiResponse = response.data;
-      order.processingMethod = 'datamart_api';
-      await order.save();
+      await DataPurchase.findByIdAndUpdate(order._id, {
+        status: 'processing',
+        updatedAt: new Date()
+      });
 
       logOperation('DATAMART_ORDER_ACCEPTED', { orderId: order._id, ref: order.geonetReference });
       return { success: true, data: response.data };
     } else {
-      order.apiResponse = response.data;
-      await order.save();
-
       logOperation('DATAMART_ORDER_REJECTED', { orderId: order._id, response: response.data });
       return { success: false, error: response.data?.message || 'DataMart rejected the order' };
     }
   } catch (error) {
-    order.apiResponse = { error: error.message, response: error.response?.data };
-    await order.save();
-
-    logOperation('DATAMART_ORDER_ERROR', { orderId: order._id, error: error.message });
+    logOperation('DATAMART_ORDER_ERROR', { orderId: order._id, error: error.message, response: error.response?.data });
     return { success: false, error: error.message };
   }
 }
