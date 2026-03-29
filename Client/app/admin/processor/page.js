@@ -90,7 +90,7 @@ export default function ProcessorDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="flex items-center justify-center py-20">
         <div className="text-center">
           <div className="animate-spin h-12 w-12 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto mb-4"></div>
           <p className="text-gray-500">Loading processor dashboard...</p>
@@ -124,7 +124,7 @@ export default function ProcessorDashboard() {
   const totalStuck = (w.stuck?.length || 0) + (g.stuck?.length || 0)
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
+    <div>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -152,12 +152,6 @@ export default function ProcessorDashboard() {
               className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700"
             >
               Refresh
-            </button>
-            <button
-              onClick={() => router.push('/admin')}
-              className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-xs font-medium"
-            >
-              Back
             </button>
           </div>
         </div>
