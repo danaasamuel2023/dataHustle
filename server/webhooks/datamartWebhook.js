@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
-const { DataPurchase, Transaction, User } = require('../schema/schema');
+const { DataPurchase, Transaction, User, GuestOrder } = require('../schema/schema');
 
 // DataMart webhook secret
 const DATAMART_WEBHOOK_SECRET = process.env.DATAMART_WEBHOOK_SECRET || '5629993a017b7a2b792feb766cc284a972783f9b0fa07cf24657a2f2f5c02741';
@@ -65,7 +65,7 @@ router.post('/datamart', verifySignature, async (req, res) => {
       return res.status(400).json({ status: 'error', message: 'Missing reference or status' });
     }
 
-    // Find purchase by geonetReference (stores DataMart orderReference)
+    // Find purchase by geonetReference (wallet orders) OR guest order reference
     const purchase = await DataPurchase.findOne({
       $or: [
         { geonetReference: dmRef },
@@ -73,16 +73,71 @@ router.post('/datamart', verifySignature, async (req, res) => {
       ],
     });
 
-    if (!purchase) {
+    // Also check guest orders
+    const guestOrder = !purchase ? await GuestOrder.findOne({
+      $or: [
+        { reference: dmRef },
+        { datamartReference: dmRef },
+        { reference: data?.orderId },
+      ],
+    }) : null;
+
+    if (!purchase && !guestOrder) {
       console.error('[Webhook:DataMart] No matching purchase for ref:', dmRef);
       return res.status(404).json({ status: 'error', message: 'Order not found' });
     }
 
+    const newStatus = status.toLowerCase();
+
+    // ===== HANDLE GUEST ORDERS =====
+    if (guestOrder) {
+      console.log('[Webhook:DataMart] Found guest order:', {
+        id: guestOrder._id,
+        ref: guestOrder.reference,
+        currentStatus: guestOrder.orderStatus,
+        newStatus,
+      });
+
+      if (['completed', 'failed', 'refunded'].includes(guestOrder.orderStatus)) {
+        return res.json({ status: 'success', message: 'Already in final state' });
+      }
+
+      if (newStatus === 'completed' || newStatus === 'success' || newStatus === 'delivered') {
+        guestOrder.orderStatus = 'completed';
+        guestOrder.completedAt = new Date();
+        if (trackingId) guestOrder.trackingId = trackingId;
+        if (deliveryInfo) guestOrder.deliveryInfo = deliveryInfo;
+        guestOrder.updatedAt = new Date();
+        await guestOrder.save();
+        console.log('[Webhook:DataMart] Guest order completed:', guestOrder.reference);
+
+      } else if (newStatus === 'processing' || newStatus === 'queued' || newStatus === 'waiting') {
+        if (guestOrder.orderStatus !== 'processing') {
+          guestOrder.orderStatus = 'processing';
+          guestOrder.updatedAt = new Date();
+          await guestOrder.save();
+        }
+
+      } else if (newStatus === 'failed' || newStatus === 'rejected' || newStatus === 'cancelled') {
+        guestOrder.orderStatus = 'failed';
+        guestOrder.adminNotes = data?.message || 'Failed via DataMart webhook';
+        if (trackingId) guestOrder.trackingId = trackingId;
+        if (deliveryInfo) guestOrder.deliveryInfo = deliveryInfo;
+        guestOrder.updatedAt = new Date();
+        await guestOrder.save();
+        console.log('[Webhook:DataMart] Guest order failed:', guestOrder.reference);
+        // Note: Guest orders paid via Paystack - admin handles refunds manually
+      }
+
+      return res.json({ status: 'success', message: 'Guest order webhook processed' });
+    }
+
+    // ===== HANDLE WALLET ORDERS (existing logic) =====
     console.log('[Webhook:DataMart] Found purchase:', {
       id: purchase._id,
       ref: purchase.geonetReference,
       currentStatus: purchase.status,
-      newStatus: status,
+      newStatus,
     });
 
     // Already in final state
@@ -90,8 +145,6 @@ router.post('/datamart', verifySignature, async (req, res) => {
       console.log('[Webhook:DataMart] Order already in final state:', purchase.status);
       return res.json({ status: 'success', message: 'Already in final state' });
     }
-
-    const newStatus = status.toLowerCase();
 
     if (newStatus === 'completed' || newStatus === 'success' || newStatus === 'delivered') {
       purchase.status = 'completed';

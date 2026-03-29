@@ -3,7 +3,7 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
-const { User, DataPurchase, Transaction, DataInventory } = require('../schema/schema');
+const { User, DataPurchase, Transaction, DataInventory, DataPrice } = require('../schema/schema');
 const dotenv = require('dotenv');
 
 dotenv.config();

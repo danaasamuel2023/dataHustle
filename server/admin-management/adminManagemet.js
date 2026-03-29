@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { User, DataPurchase, Transaction, ReferralBonus,DataInventory } = require('../schema/schema');
+const { User, DataPurchase, Transaction, ReferralBonus, DataInventory, DataPrice, GuestOrder } = require('../schema/schema');
 const mongoose = require('mongoose');
 const auth = require('../middlewareUser/middleware');
 const adminAuth = require('../adminMiddleware/middleware');
@@ -1750,5 +1750,153 @@ router.get('/dashboard/statistics', auth, adminAuth, async (req, res) => {
   }
 });
 
+
+// ===== ADMIN DATA PRICE MANAGEMENT =====
+
+// Hardcoded fallback prices
+const FALLBACK_PRICING = {
+  'YELLO': { 1: 4.20, 2: 8.80, 3: 12.80, 4: 17.80, 5: 22.30, 6: 25.00, 8: 33.00, 10: 41.00, 15: 59.50, 20: 79.00, 25: 99.00, 30: 121.00, 40: 158.00, 50: 200.00 },
+  'AT_PREMIUM': { 1: 3.95, 2: 8.35, 3: 13.25, 4: 16.50, 5: 19.50, 6: 23.50, 8: 30.50, 10: 38.50, 12: 45.50, 15: 57.50, 25: 95.00, 30: 115.00, 40: 151.00, 50: 190.00 },
+  'TELECEL': { 5: 19.50, 8: 34.64, 10: 36.50, 12: 43.70, 15: 52.85, 20: 69.80, 25: 86.75, 30: 103.70, 35: 120.65, 40: 137.60, 45: 154.55, 50: 171.50, 100: 341.00 }
+};
+
+// GET all prices
+router.get('/admin/data-prices', auth, adminAuth, async (req, res) => {
+  try {
+    const prices = await DataPrice.find().sort({ network: 1, capacity: 1 });
+    res.json({ status: 'success', data: prices });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+// CREATE or UPDATE a price
+router.post('/admin/data-prices', auth, adminAuth, async (req, res) => {
+  try {
+    const { network, capacity, price } = req.body;
+
+    if (!network || !capacity || !price) {
+      return res.status(400).json({ status: 'error', message: 'network, capacity, and price are required' });
+    }
+
+    const existing = await DataPrice.findOne({ network, capacity: Number(capacity) });
+    if (existing) {
+      existing.price = Number(price);
+      existing.updatedAt = new Date();
+      await existing.save();
+      return res.json({ status: 'success', message: 'Price updated', data: existing });
+    }
+
+    const newPrice = new DataPrice({
+      network,
+      capacity: Number(capacity),
+      price: Number(price)
+    });
+    await newPrice.save();
+    res.status(201).json({ status: 'success', message: 'Price created', data: newPrice });
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(400).json({ status: 'error', message: 'Price for this network and capacity already exists' });
+    }
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+// UPDATE a price by ID
+router.put('/admin/data-prices/:id', auth, adminAuth, async (req, res) => {
+  try {
+    const { price, isActive } = req.body;
+    const update = { updatedAt: new Date() };
+    if (price !== undefined) update.price = Number(price);
+    if (isActive !== undefined) update.isActive = isActive;
+
+    const doc = await DataPrice.findByIdAndUpdate(req.params.id, update, { new: true });
+    if (!doc) return res.status(404).json({ status: 'error', message: 'Price not found' });
+
+    res.json({ status: 'success', data: doc });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+// DELETE a price
+router.delete('/admin/data-prices/:id', auth, adminAuth, async (req, res) => {
+  try {
+    const doc = await DataPrice.findByIdAndDelete(req.params.id);
+    if (!doc) return res.status(404).json({ status: 'error', message: 'Price not found' });
+    res.json({ status: 'success', message: 'Price deleted' });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+// SEED prices from hardcoded fallback (only adds missing ones)
+router.post('/admin/data-prices/seed', auth, adminAuth, async (req, res) => {
+  try {
+    let created = 0;
+    let skipped = 0;
+
+    for (const [network, bundles] of Object.entries(FALLBACK_PRICING)) {
+      for (const [capacity, price] of Object.entries(bundles)) {
+        const exists = await DataPrice.findOne({ network, capacity: Number(capacity) });
+        if (!exists) {
+          await DataPrice.create({ network, capacity: Number(capacity), price });
+          created++;
+        } else {
+          skipped++;
+        }
+      }
+    }
+
+    res.json({ status: 'success', message: `Seeded ${created} prices, skipped ${skipped} existing` });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+// ===== ADMIN GUEST ORDERS =====
+
+// GET all guest orders
+router.get('/admin/guest-orders', auth, adminAuth, async (req, res) => {
+  try {
+    const { page = 1, limit = 50, paymentStatus, orderStatus, network } = req.query;
+    const filter = {};
+    if (paymentStatus) filter.paymentStatus = paymentStatus;
+    if (orderStatus) filter.orderStatus = orderStatus;
+    if (network) filter.network = network;
+
+    const total = await GuestOrder.countDocuments(filter);
+    const orders = await GuestOrder.find(filter)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(Number(limit));
+
+    res.json({
+      status: 'success',
+      data: { orders, total, page: Number(page), totalPages: Math.ceil(total / limit) }
+    });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+// UPDATE guest order status
+router.put('/admin/guest-orders/:id/status', auth, adminAuth, async (req, res) => {
+  try {
+    const { orderStatus, adminNotes } = req.body;
+    const order = await GuestOrder.findById(req.params.id);
+    if (!order) return res.status(404).json({ status: 'error', message: 'Order not found' });
+
+    if (orderStatus) order.orderStatus = orderStatus;
+    if (adminNotes) order.adminNotes = adminNotes;
+    if (orderStatus === 'completed') order.completedAt = new Date();
+    order.updatedAt = new Date();
+    await order.save();
+
+    res.json({ status: 'success', data: order });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
 
 module.exports = router;

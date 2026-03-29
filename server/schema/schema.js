@@ -270,6 +270,44 @@ OrderReportSchema.index({ userId: 1 });
 OrderReportSchema.index({ purchaseId: 1 });
 OrderReportSchema.index({ status: 1 });
 
+// Data Price Schema - admin-managed prices stored in DB
+const DataPriceSchema = new mongoose.Schema({
+  network: { type: String, enum: ['YELLO', 'TELECEL', 'AT_PREMIUM'], required: true },
+  capacity: { type: Number, required: true }, // in GB
+  price: { type: Number, required: true }, // in GHS
+  isActive: { type: Boolean, default: true },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+DataPriceSchema.index({ network: 1, capacity: 1 }, { unique: true });
+
+// Guest Order Schema - orders from guest buy page (Paystack direct)
+const GuestOrderSchema = new mongoose.Schema({
+  reference: { type: String, required: true, unique: true },
+  customerName: { type: String, required: true },
+  customerPhone: { type: String, required: true },
+  recipientPhone: { type: String, required: true },
+  network: { type: String, enum: ['YELLO', 'TELECEL', 'AT_PREMIUM'], required: true },
+  capacity: { type: Number, required: true },
+  price: { type: Number, required: true },
+  paymentStatus: { type: String, enum: ['pending', 'paid', 'failed'], default: 'pending' },
+  orderStatus: { type: String, enum: ['pending', 'processing', 'completed', 'failed', 'refunded'], default: 'pending' },
+  paystackReference: { type: String },
+  datamartReference: { type: String },
+  adminNotes: { type: String },
+  trackingId: { type: String },
+  deliveryInfo: { type: String },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+  paidAt: { type: Date },
+  completedAt: { type: Date }
+});
+
+GuestOrderSchema.index({ paymentStatus: 1, orderStatus: 1 });
+GuestOrderSchema.index({ recipientPhone: 1 });
+GuestOrderSchema.index({ reference: 1 });
+
 // Export all models
 const User = mongoose.model("Userdatahustle", UserSchema);
 const DataPurchase = mongoose.model("DataPurchasedatahustle", DataPurchaseSchema);
@@ -279,5 +317,7 @@ const ApiKey = mongoose.model('ApiKeydatahusle', apiKeySchema);
 const DataInventory = mongoose.model("DataInventorydatahustle", DataInventorySchema);
 const OrderReport = mongoose.model("OrderReporthustle", OrderReportSchema);
 const SMSHistory = mongoose.model("SMSHistory", SMSHistorySchema);
+const DataPrice = mongoose.model("DataPricedatahustle", DataPriceSchema);
+const GuestOrder = mongoose.model("GuestOrderdatahustle", GuestOrderSchema);
 
-module.exports = { User, DataPurchase, Transaction, ReferralBonus, ApiKey, DataInventory, OrderReport, SMSHistory };
+module.exports = { User, DataPurchase, Transaction, ReferralBonus, ApiKey, DataInventory, OrderReport, SMSHistory, DataPrice, GuestOrder };

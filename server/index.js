@@ -35,6 +35,9 @@ const settingsRoutes = require('./storeRoutes/settingsRoutes.js');
 // Support Team Routes
 const supportRoutes = require('./supportRoutes/support.js');
 
+// Guest Purchase Routes
+const guestPurchase = require('./guestPurchase/guestPurchase.js');
+
 // Initialize Express app
 const app = express();
 
@@ -78,6 +81,9 @@ app.use('/api/v1/settings', settingsRoutes);
 
 // Support Team Routes
 app.use('/api/support', supportRoutes);
+
+// Guest Purchase (public buy page)
+app.use('/api/guest', guestPurchase);
 
 // DataMart Webhook (order status updates)
 const datamartWebhook = require('./webhooks/datamartWebhook');
@@ -123,6 +129,78 @@ setInterval(async () => {
     // Silently ignore — orders will be retried next cycle
   }
 }, 30000);
+
+// =============================================================================
+// GUEST ORDER PROCESSOR
+// Picks up paid guest orders and sends them to DataMart API
+// =============================================================================
+const { GuestOrder, DataInventory: GuestInventory } = require('./schema/schema');
+
+const DATAMART_BASE_URL_GUEST = 'https://api.datamartgh.shop';
+const DATAMART_API_KEY_GUEST = process.env.DATAMART_API_KEY || 'fb9b9e81e9640c1861605b4ec333e3bd57bdf70dcce461d766fa877c9c0f7553';
+
+const datamartClientGuest = axios.create({
+  baseURL: DATAMART_BASE_URL_GUEST,
+  headers: {
+    'x-api-key': DATAMART_API_KEY_GUEST,
+    'Content-Type': 'application/json'
+  }
+});
+
+const mapNetworkForDatamart = (network) => {
+  const map = { 'YELLO': 'YELLO', 'AT_PREMIUM': 'at', 'TELECEL': 'TELECEL' };
+  return map[network] || network;
+};
+
+setInterval(async () => {
+  try {
+    const paidOrders = await GuestOrder.find({
+      paymentStatus: 'paid',
+      orderStatus: 'pending'
+    }).limit(10);
+
+    if (paidOrders.length === 0) return;
+
+    console.log(`[GUEST_ORDER_QUEUE] Processing ${paidOrders.length} paid guest orders`);
+
+    for (const order of paidOrders) {
+      try {
+        // Check inventory
+        const inv = await GuestInventory.findOne({ network: order.network });
+        if (inv && !inv.inStock) {
+          console.log(`[GUEST_ORDER_QUEUE] ${order.reference}: Network ${order.network} out of stock, skipping`);
+          continue;
+        }
+
+        // Send to DataMart
+        const datamartNetwork = mapNetworkForDatamart(order.network);
+        const datamartPayload = {
+          phoneNumber: order.recipientPhone,
+          network: datamartNetwork,
+          capacity: order.capacity.toString(),
+          gateway: 'wallet',
+          ref: order.reference
+        };
+
+        const dmResponse = await datamartClientGuest.post('/api/developer/purchase', datamartPayload);
+
+        if (dmResponse.data && dmResponse.data.status === 'success') {
+          order.orderStatus = 'processing';
+          order.datamartReference = dmResponse.data.data?.purchaseId || order.reference;
+          order.updatedAt = new Date();
+          await order.save();
+          console.log(`[GUEST_ORDER_QUEUE] ${order.reference}: Sent to DataMart, status: processing`);
+        } else {
+          console.error(`[GUEST_ORDER_QUEUE] ${order.reference}: DataMart rejected:`, dmResponse.data?.message);
+        }
+      } catch (err) {
+        console.error(`[GUEST_ORDER_QUEUE] ${order.reference}: Error:`, err.response?.data?.message || err.message);
+      }
+    }
+  } catch (error) {
+    // Silently ignore
+  }
+}, 15000); // Every 15 seconds
 
 // Start Server
 const PORT = process.env.PORT || 5000;
