@@ -146,6 +146,7 @@ export default function DataPurchases() {
     total: purchases.length,
     completed: purchases.filter(p => p.status === 'completed').length,
     pending: purchases.filter(p => p.status === 'pending').length,
+    processing: purchases.filter(p => ['processing', 'waiting'].includes(p.status)).length,
     failed: purchases.filter(p => p.status === 'failed').length,
     totalAmount: purchases.reduce((sum, p) => sum + p.price, 0)
   };
@@ -159,12 +160,17 @@ export default function DataPurchases() {
           text: 'Completed'
         };
       case 'pending':
-      case 'processing':
-      case 'waiting':
-        return { 
-          icon: <Clock className="w-4 h-4" />, 
+        return {
+          icon: <Clock className="w-4 h-4" />,
           color: 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 border border-yellow-200 dark:border-yellow-800',
           text: 'Pending'
+        };
+      case 'processing':
+      case 'waiting':
+        return {
+          icon: <Clock className="w-4 h-4 animate-spin" />,
+          color: 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800',
+          text: 'Processing'
         };
       case 'failed':
         return { 
