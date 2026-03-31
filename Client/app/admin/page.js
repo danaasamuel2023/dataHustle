@@ -24,6 +24,8 @@ const AdminUsers = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showTransactionsModal, setShowTransactionsModal] = useState(false);
   const [showDisableModal, setShowDisableModal] = useState(false);
+  const [showChangeRoleModal, setShowChangeRoleModal] = useState(false);
+  const [selectedRole, setSelectedRole] = useState('');
   const [amountToAdd, setAmountToAdd] = useState('');
   const [amountToDeduct, setAmountToDeduct] = useState('');
   const [deductionReason, setDeductionReason] = useState('');
@@ -279,6 +281,44 @@ const AdminUsers = () => {
     } catch (err) {
       console.error('Error toggling user status:', err);
       toast.error(err.response?.data?.msg || 'Failed to update user status');
+    } finally {
+      setProcessingAction(false);
+    }
+  };
+
+  const handleChangeRole = async () => {
+    if (!selectedRole) {
+      toast.error('Please select a role');
+      return;
+    }
+
+    try {
+      setProcessingAction(true);
+      const token = localStorage.getItem('authToken');
+
+      await axios.put(
+        `https://datahustle.onrender.com/api/users/${selectedUser._id}`,
+        { role: selectedRole },
+        {
+          headers: {
+            'x-auth-token': token
+          }
+        }
+      );
+
+      setUsers(users.map(user =>
+        user._id === selectedUser._id
+          ? { ...user, role: selectedRole }
+          : user
+      ));
+
+      toast.success(`${selectedUser.name}'s role changed to ${selectedRole}`);
+      setShowChangeRoleModal(false);
+      setSelectedRole('');
+      setSelectedUser(null);
+    } catch (err) {
+      console.error('Error changing role:', err);
+      toast.error(err.response?.data?.msg || 'Failed to change user role');
     } finally {
       setProcessingAction(false);
     }
@@ -540,10 +580,16 @@ const AdminUsers = () => {
                           </td>
                           <td className={`px-6 py-4 whitespace-nowrap border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              user.role === 'admin' 
+                              user.role === 'admin'
                                 ? darkMode ? 'bg-purple-900 text-purple-200' : 'bg-purple-100 text-purple-800'
-                                : user.role === 'seller' 
+                                : user.role === 'seller'
                                 ? darkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-800'
+                                : user.role === 'worker'
+                                ? darkMode ? 'bg-yellow-900 text-yellow-200' : 'bg-yellow-100 text-yellow-800'
+                                : user.role === 'Dealer'
+                                ? darkMode ? 'bg-orange-900 text-orange-200' : 'bg-orange-100 text-orange-800'
+                                : user.role === 'reporter'
+                                ? darkMode ? 'bg-pink-900 text-pink-200' : 'bg-pink-100 text-pink-800'
                                 : darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'
                             }`}>
                               {user.role}
@@ -615,10 +661,25 @@ const AdminUsers = () => {
                                 {user.isDisabled ? 'Enable' : 'Disable'}
                               </button>
                               <button
+                                onClick={() => {
+                                  setSelectedUser(user);
+                                  setSelectedRole(user.role);
+                                  setShowChangeRoleModal(true);
+                                }}
+                                className={`px-3 py-1 rounded-md text-sm transition-colors duration-200 ${
+                                  darkMode
+                                    ? 'bg-purple-600 text-white hover:bg-purple-700'
+                                    : 'bg-purple-500 text-white hover:bg-purple-600'
+                                }`}
+                                title="Change user role"
+                              >
+                                Change Role
+                              </button>
+                              <button
                                 onClick={() => router.push(`/admin/users/${user._id}`)}
                                 className={`px-3 py-1 rounded-md text-sm transition-colors duration-200 ${
-                                  darkMode 
-                                    ? 'bg-indigo-600 text-white hover:bg-indigo-700' 
+                                  darkMode
+                                    ? 'bg-indigo-600 text-white hover:bg-indigo-700'
                                     : 'bg-indigo-500 text-white hover:bg-indigo-600'
                                 }`}
                                 title="Edit user details"
@@ -992,6 +1053,63 @@ const AdminUsers = () => {
                 disabled={processingAction}
               >
                 {processingAction ? 'Processing...' : 'Delete User'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showChangeRoleModal && selectedUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className={`rounded-lg p-6 w-full max-w-md ${darkMode ? 'bg-gray-800 text-white' : 'bg-white'}`}>
+            <h2 className="text-xl font-bold mb-4">Change User Role</h2>
+            <p className="mb-4">
+              Change role for <span className="font-semibold">{selectedUser.name}</span>
+              <br />
+              <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                Current role: <span className="font-medium">{selectedUser.role}</span>
+              </span>
+            </p>
+            <div className="mb-4">
+              <label className={`block mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Select New Role</label>
+              <select
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value)}
+                className={`w-full p-2 border rounded-md ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`}
+              >
+                <option value="buyer">Buyer</option>
+                <option value="seller">Seller</option>
+                <option value="reporter">Reporter</option>
+                <option value="admin">Admin</option>
+                <option value="Dealer">Dealer</option>
+                <option value="worker">Worker</option>
+              </select>
+            </div>
+            {selectedRole === 'admin' && (
+              <div className={`p-3 mb-4 rounded-lg ${darkMode ? 'bg-yellow-900 text-yellow-100' : 'bg-yellow-50 text-yellow-700'}`}>
+                <p className="text-sm">
+                  <strong>Warning:</strong> Granting admin role will give this user full access to the admin panel and all management features.
+                </p>
+              </div>
+            )}
+            <div className="flex justify-end space-x-2">
+              <button
+                onClick={() => {
+                  setShowChangeRoleModal(false);
+                  setSelectedUser(null);
+                  setSelectedRole('');
+                }}
+                className={`px-4 py-2 rounded-md ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`}
+                disabled={processingAction}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleChangeRole}
+                className="px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors duration-200"
+                disabled={processingAction || selectedRole === selectedUser.role}
+              >
+                {processingAction ? 'Processing...' : 'Change Role'}
               </button>
             </div>
           </div>
