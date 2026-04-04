@@ -656,6 +656,15 @@ export default function RootLayout({ children }) {
             })(window, document, "clarity", "script", "YOUR_CLARITY_ID");
           `}
         </Script>
+
+        {/* DataMart Delivery Tracker Widget */}
+        <Script
+          src="https://api.datamartgh.shop/widgets/delivery-tracker.js"
+          data-api-key="fb9b9e81e9640c1861605b4ec333e3bd57bdf70dcce461d766fa877c9c0f7553"
+          data-theme="dark"
+          data-position="bottom-right"
+          strategy="lazyOnload"
+        />
       </body>
     </html>
   );
