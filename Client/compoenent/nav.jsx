@@ -305,7 +305,7 @@ const MobileNavbar = () => {
         return;
       }
 
-      const response = await fetch('https://datahustle.onrender.com/api/payments/claim', {
+      const response = await fetch('https://api.datahustle.shop/api/payments/claim', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

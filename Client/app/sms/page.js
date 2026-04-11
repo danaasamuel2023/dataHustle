@@ -41,7 +41,7 @@ const SMSDashboard = () => {
   };
 
   // API base URL - adjust this to match your backend
-  const API_BASE_URL = 'https://datahustle.onrender.com/api';
+  const API_BASE_URL = 'https://api.datahustle.shop/api';
 
   // API call helper with x-auth-token
   const apiCall = async (endpoint, options = {}) => {

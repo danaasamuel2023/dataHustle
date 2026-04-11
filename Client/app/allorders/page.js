@@ -94,7 +94,7 @@ const AdminOrders = () => {
         if (statusFilter) params.append('status', statusFilter);
         if (networkFilter) params.append('network', networkFilter);
         
-        const res = await fetch(`https://datahustle.onrender.com/api/orders?${params.toString()}`, {
+        const res = await fetch(`https://api.datahustle.shop/api/orders?${params.toString()}`, {
           headers: {
             'x-auth-token': authToken
           }
@@ -144,7 +144,7 @@ const AdminOrders = () => {
     }
 
     try {
-      const res = await fetch(`https://datahustle.onrender.com/api/orders/${orderId}/status`, {
+      const res = await fetch(`https://api.datahustle.shop/api/orders/${orderId}/status`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -200,7 +200,7 @@ const AdminOrders = () => {
       
       for (const orderId of selectedOrders) {
         try {
-          const res = await fetch(`https://datahustle.onrender.com/api/orders/${orderId}/status`, {
+          const res = await fetch(`https://api.datahustle.shop/api/orders/${orderId}/status`, {
             method: "PUT",
             headers: {
               "Content-Type": "application/json",

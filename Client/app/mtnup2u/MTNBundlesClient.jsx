@@ -4,7 +4,7 @@ import axios from 'axios';
 import { useRouter } from 'next/navigation';
 
 // ===== DATA HUSTLE CONFIGURATION =====
-const API_BASE = 'https://datahustle.onrender.com';
+const API_BASE = 'https://api.datahustle.shop';
 
 const handle401 = (router) => {
   localStorage.removeItem('authToken');

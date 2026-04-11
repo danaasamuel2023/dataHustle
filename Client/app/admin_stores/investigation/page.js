@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useTheme } from 'next-themes'
 
-const API_BASE = 'https://datahustle.onrender.com/api/v1'
+const API_BASE = 'https://api.datahustle.shop/api/v1'
 
 function InvestigationContent() {
   const { resolvedTheme } = useTheme()

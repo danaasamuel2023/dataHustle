@@ -7,7 +7,7 @@ import {
   AlertCircle, Calendar, Copy, Check
 } from 'lucide-react';
 
-const API_BASE_URL = 'https://datahustle.onrender.com/api/v1';
+const API_BASE_URL = 'https://api.datahustle.shop/api/v1';
 
 const formatMoney = (amount) => {
   return new Intl.NumberFormat('en-GH', {

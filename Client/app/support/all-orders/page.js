@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useTheme } from 'next-themes'
 
-const API = 'https://datahustle.onrender.com/api/support'
+const API = 'https://api.datahustle.shop/api/support'
 const statusColors = {
   completed: 'bg-green-500/20 text-green-400',
   processing: 'bg-yellow-500/20 text-yellow-400',

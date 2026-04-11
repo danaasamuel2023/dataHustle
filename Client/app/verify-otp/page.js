@@ -86,7 +86,7 @@ const VerifyAndResetContent = ({ initialPhone }) => {
     setError('');
 
     try {
-      await axios.post('https://datahustle.onrender.com/api/v1/resend-password-reset-otp', {
+      await axios.post('https://api.datahustle.shop/api/v1/resend-password-reset-otp', {
         phoneNumber
       });
       setTimeLeft(600); // Reset timer to 10 minutes
@@ -115,7 +115,7 @@ const VerifyAndResetContent = ({ initialPhone }) => {
     setError('');
 
     try {
-      await axios.post('https://datahustle.onrender.com/api/v1/reset-password', {
+      await axios.post('https://api.datahustle.shop/api/v1/reset-password', {
         phoneNumber,
         otp,
         newPassword

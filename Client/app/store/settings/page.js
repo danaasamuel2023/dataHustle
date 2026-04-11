@@ -18,7 +18,7 @@ import {
   Check
 } from 'lucide-react';
 
-const API_BASE = 'https://datahustle.onrender.com/api/v1';
+const API_BASE = 'https://api.datahustle.shop/api/v1';
 
 const TABS = [
   { id: 'general', name: 'General', icon: Store },

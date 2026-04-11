@@ -13,7 +13,7 @@ import {
   Info
 } from 'lucide-react';
 
-const API_BASE_URL = 'https://datahustle.onrender.com/api/v1';
+const API_BASE_URL = 'https://api.datahustle.shop/api/v1';
 
 const DataHustleDeposit = () => {
   const [amount, setAmount] = useState('');

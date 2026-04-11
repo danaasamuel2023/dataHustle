@@ -27,7 +27,7 @@ export default function Leaderboard() {
     fetchLeaderboardData();
     
     // Set up WebSocket connection
-    const socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
+    const socket = io(process.env.NEXT_PUBLIC_API_URL || 'https://api.datahustle.shop');
     
     socket.on('connect', () => {
       console.log('WebSocket connected');

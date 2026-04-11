@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://datahustle.onrender.com'
+const API = process.env.NEXT_PUBLIC_API_URL || 'https://api.datahustle.shop'
 
 const NETWORK_COLORS = {
   YELLO: 'bg-yellow-500 text-black',

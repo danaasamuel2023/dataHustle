@@ -21,7 +21,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 
-const API_BASE = 'https://datahustle.onrender.com/api/v1';
+const API_BASE = 'https://api.datahustle.shop/api/v1';
 
 const NETWORKS = [
   { value: 'mtn', label: 'MTN Mobile Money', color: 'yellow' },

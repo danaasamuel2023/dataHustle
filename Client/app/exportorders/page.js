@@ -134,7 +134,7 @@ export default function OrdersAdmin() {
       if (searchTerm) queryParams.append('search', searchTerm);
       queryParams.append('searchAllPages', 'true'); // Always search across all orders
       
-      const response = await axios.get(`http://localhost:5000/api/admin-orders?${queryParams.toString()}`, {
+      const response = await axios.get(`https://api.datahustle.shop/api/admin-orders?${queryParams.toString()}`, {
         headers: {
           'x-auth-token': `${localStorage.getItem('authToken')}` // Adjust based on your auth system
         }
@@ -183,7 +183,7 @@ export default function OrdersAdmin() {
       if (filters.startDate) queryParams.append('startDate', filters.startDate);
       if (filters.endDate) queryParams.append('endDate', filters.endDate);
       
-      const endpoint = processingExport ? 'http://localhost:5000/api/export/processing' : 'http://localhost:5000/api/export';
+      const endpoint = processingExport ? 'https://api.datahustle.shop/api/export/processing' : 'https://api.datahustle.shop/api/export';
       
       toast.loading('Generating export...');
       
@@ -241,7 +241,7 @@ export default function OrdersAdmin() {
       
       toast.loading('Updating orders...');
       
-      const response = await axios.put('http://localhost:5000/api/orders/time-range-update', timeUpdateForm, {
+      const response = await axios.put('https://api.datahustle.shop/api/orders/time-range-update', timeUpdateForm, {
         headers: {
          'x-auth-token': `${localStorage.getItem('authToken')}`
         }
@@ -273,7 +273,7 @@ export default function OrdersAdmin() {
     try {
       toast.loading(`Updating ${selectedIds.length} orders...`);
       
-      const response = await axios.put('http://localhost:5000/api/orders/bulk-status-update', {
+      const response = await axios.put('https://api.datahustle.shop/api/orders/bulk-status-update', {
         orderIds: selectedIds,
         status: bulkAction
       }, {

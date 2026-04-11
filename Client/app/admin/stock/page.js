@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://datahustle.onrender.com'
+const API = process.env.NEXT_PUBLIC_API_URL || 'https://api.datahustle.shop'
 
 const NETWORK_LABELS = {
   YELLO: { name: 'MTN (YELLO)', color: '#FBBF24', emoji: '🟡' },

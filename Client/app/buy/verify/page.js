@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { CheckCircle, XCircle, Loader2, Clock, Package, Database } from 'lucide-react';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://datahustle.onrender.com';
+const API = process.env.NEXT_PUBLIC_API_URL || 'https://api.datahustle.shop';
 
 function VerifyContent() {
   const searchParams = useSearchParams();

@@ -109,7 +109,7 @@ export default function VerificationDetailPage({ params }) {
     try {
       setLoading(true);
       
-      const response = await fetch(`https://datahustle.onrender.com/api/verifications/${id}?userId=${userId}`);
+      const response = await fetch(`https://api.datahustle.shop/api/verifications/${id}?userId=${userId}`);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch verification details: ${response.status} ${response.statusText}`);
@@ -163,7 +163,7 @@ export default function VerificationDetailPage({ params }) {
 
   const fetchVerificationCode = async (id, userId) => {
     try {
-      const response = await fetch(`https://datahustle.onrender.com/api/verifications/${id}/code?userId=${userId}`);
+      const response = await fetch(`https://api.datahustle.shop/api/verifications/${id}/code?userId=${userId}`);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch verification code: ${response.status} ${response.statusText}`);
@@ -243,7 +243,7 @@ export default function VerificationDetailPage({ params }) {
         throw new Error('User not authenticated');
       }
       
-      const response = await fetch(`https://datamartbackened.onrender.com/api/verifications/${verificationId}/${action}`, {
+      const response = await fetch(`https://api.datahustle.shop/api/verifications/${verificationId}/${action}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

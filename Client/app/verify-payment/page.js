@@ -46,7 +46,7 @@ function VerifyPaymentClient() {
 
   const fetchOrderDetails = async (ref) => {
     try {
-      const response = await axios.get(`https://datahustle.onrender.com/api/momo-purchase/order/${ref}`);
+      const response = await axios.get(`https://api.datahustle.shop/api/momo-purchase/order/${ref}`);
       if (response.data.status === 'success') {
         setOrderData(response.data.data);
       }
@@ -61,7 +61,7 @@ function VerifyPaymentClient() {
 
     const checkStatus = async () => {
       try {
-        const response = await axios.get(`https://datahustle.onrender.com/api/momo-purchase/verify?reference=${ref}`, {
+        const response = await axios.get(`https://api.datahustle.shop/api/momo-purchase/verify?reference=${ref}`, {
           headers: { 'Accept': 'application/json' }
         });
         

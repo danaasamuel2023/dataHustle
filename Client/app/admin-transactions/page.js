@@ -69,7 +69,7 @@ const IconHash = () => (
 );
 
 // Define API base URL - replace with your actual API URL
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://datahustle.onrender.com/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.datahustle.shop/api';
 
 export default function AdminTransactions() {
   const router = useRouter();

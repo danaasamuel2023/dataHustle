@@ -54,7 +54,7 @@ const WeeklySalesChart = ({ userId = getUserIdFromLocalStorage() }) => {
       // Get auth token from localStorage
       const authToken = localStorage.getItem('authToken');
       
-      const response = await fetch(`http://localhost:5000/api/weekly-sales?${queryParams.toString()}`, {
+      const response = await fetch(`https://api.datahustle.shop/api/weekly-sales?${queryParams.toString()}`, {
         headers: {
           'Authorization': authToken ? `Bearer ${authToken}` : '',
           'Content-Type': 'application/json'

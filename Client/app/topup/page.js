@@ -73,7 +73,7 @@ export default function DepositPage() {
     setSuccessMsg('');
     
     try {
-      const res = await fetch('https://datahustle.onrender.com/api/v1/deposit', {
+      const res = await fetch('https://api.datahustle.shop/api/v1/deposit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -29,7 +29,7 @@ export default function UserReports() {
       
       try {
         setLoading(true);
-        const response = await axios.get(`https://datamartbackened.onrender.com/api/reports/my-reports/${userId}`);
+        const response = await axios.get(`https://api.datahustle.shop/api/reports/my-reports/${userId}`);
         
         if (response.data.status === 'success') {
           setReports(response.data.data.reports);

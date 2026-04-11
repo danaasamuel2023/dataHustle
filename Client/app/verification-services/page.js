@@ -78,7 +78,7 @@ export default function VerificationServicesPage() {
       setLoading(true);
       // Try to fetch from API first
       try {
-        const response = await fetch('https://datamartbackened.onrender.com/api/verifications/services');
+        const response = await fetch('https://api.datahustle.shop/api/verifications/services');
         
         if (!response.ok) {
           throw new Error(`Failed to fetch services: ${response.status} ${response.statusText}`);
@@ -264,7 +264,7 @@ export default function VerificationServicesPage() {
       
       // Otherwise, make a real API request
       console.log('Sending verification request for:', selectedService.name, 'with capability:', capability);
-      const response = await fetch('https://datamartbackened.onrender.com/api/verifications', {
+      const response = await fetch('https://api.datahustle.shop/api/verifications', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

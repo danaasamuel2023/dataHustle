@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Package, Moon, Sun, AlertCircle, XCircle, Shield, User, Clock, Search, CheckCircle, Loader2, Phone, Hash, ChevronDown, ChevronUp, MapPin, MessageCircle, Database } from 'lucide-react';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://datahustle.onrender.com';
+const API = process.env.NEXT_PUBLIC_API_URL || 'https://api.datahustle.shop';
 const WHATSAPP_CHANNEL = 'https://whatsapp.com/channel/0029Vb6zDvaGzzKTwCWszC1Z';
 
 // Toast Component

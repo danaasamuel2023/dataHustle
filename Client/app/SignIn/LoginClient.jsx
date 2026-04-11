@@ -30,7 +30,7 @@ export default function LoginClient() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('https://datahustle.onrender.com/api/v1/login', {
+      const response = await fetch('https://api.datahustle.shop/api/v1/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),

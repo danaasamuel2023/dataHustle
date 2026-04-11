@@ -20,7 +20,7 @@ function PaymentCallbackClient() {
       
       const verifyPayment = async () => {
         try {
-          const response = await axios.get(`https://datahustle.onrender.com/api/v1/verify-payment?reference=${reference}`);
+          const response = await axios.get(`https://api.datahustle.shop/api/v1/verify-payment?reference=${reference}`);
           
           if (response.data.success) {
             setStatus('success');

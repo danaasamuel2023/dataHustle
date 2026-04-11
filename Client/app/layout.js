@@ -558,7 +558,7 @@ export default function RootLayout({ children }) {
         {/* Preconnect to important origins */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://datahustle.onrender.com" />
+        <link rel="preconnect" href="https://api.datahustle.shop" />
         
         {/* DNS Prefetch */}
         <link rel="dns-prefetch" href="https://www.googletagmanager.com" />

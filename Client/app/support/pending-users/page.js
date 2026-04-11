@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useTheme } from 'next-themes'
 
-const API = 'https://datahustle.onrender.com/api/support'
+const API = 'https://api.datahustle.shop/api/support'
 
 export default function PendingUsersPage() {
   const { resolvedTheme } = useTheme()

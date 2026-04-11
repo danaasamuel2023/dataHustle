@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useTheme } from 'next-themes'
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://datahustle.onrender.com'
+const API = process.env.NEXT_PUBLIC_API_URL || 'https://api.datahustle.shop'
 const getHeaders = () => ({ 'x-auth-token': localStorage.getItem('authToken'), 'Content-Type': 'application/json' })
 
 const fmt = (d) => d ? new Date(d).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'

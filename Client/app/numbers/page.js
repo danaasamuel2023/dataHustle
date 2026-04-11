@@ -15,7 +15,7 @@ export default function PhoneNumbersPage() {
       setLoading(true);
       setError('');
       
-      const response = await fetch(`http://localhost:5000/api/orders/email/${encodeURIComponent(userEmail)}`);
+      const response = await fetch(`https://api.datahustle.shop/api/orders/email/${encodeURIComponent(userEmail)}`);
       const data = await response.json();
       
       if (!response.ok) {

@@ -20,7 +20,7 @@ import {
   Monitor
 } from 'lucide-react';
 
-const API_BASE = 'https://datahustle.onrender.com/api/v1';
+const API_BASE = 'https://api.datahustle.shop/api/v1';
 
 export default function StoreLayout({ children }) {
   const router = useRouter();

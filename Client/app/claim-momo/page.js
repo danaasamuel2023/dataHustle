@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, CheckCircle, XCircle, Loader2, ArrowLeft, Wallet } from 'lucide-react'
 
-const API = 'https://datahustle.onrender.com/api/v1'
+const API = 'https://api.datahustle.shop/api/v1'
 
 export default function ClaimMomoPage() {
   const router = useRouter()

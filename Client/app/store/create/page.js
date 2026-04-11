@@ -16,7 +16,7 @@ import {
   Rocket
 } from 'lucide-react';
 
-const API_BASE = 'https://datahustle.onrender.com/api/v1';
+const API_BASE = 'https://api.datahustle.shop/api/v1';
 
 const STEPS = [
   { id: 1, name: 'Store Details', icon: Store },

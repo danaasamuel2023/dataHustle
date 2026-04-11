@@ -80,7 +80,7 @@ const AdminUsers = () => {
       }
       
       const response = await axios.get(
-        `https://datahustle.onrender.com/api/users?page=${page}&search=${search}&sortBy=${sortBy}&sortOrder=${sortOrder}`,
+        `https://api.datahustle.shop/api/users?page=${page}&search=${search}&sortBy=${sortBy}&sortOrder=${sortOrder}`,
         {
           headers: {
             'x-auth-token': token
@@ -145,7 +145,7 @@ const AdminUsers = () => {
       const token = localStorage.getItem('authToken');
       
       const response = await axios.get(
-        `https://datahustle.onrender.com/api/transactions?userId=${userId}`,
+        `https://api.datahustle.shop/api/transactions?userId=${userId}`,
         {
           headers: {
             'x-auth-token': token
@@ -179,7 +179,7 @@ const AdminUsers = () => {
       const token = localStorage.getItem('authToken');
       
       const response = await axios.put(
-        `https://datahustle.onrender.com/api/users/${selectedUser._id}/add-money`,
+        `https://api.datahustle.shop/api/users/${selectedUser._id}/add-money`,
         { amount: parseFloat(amountToAdd) },
         {
           headers: {
@@ -217,7 +217,7 @@ const AdminUsers = () => {
       const token = localStorage.getItem('authToken');
       
       const response = await axios.put(
-        `https://datahustle.onrender.com/api/users/${selectedUser._id}/deduct-money`,
+        `https://api.datahustle.shop/api/users/${selectedUser._id}/deduct-money`,
         { 
           amount: parseFloat(amountToDeduct),
           reason: deductionReason 
@@ -258,7 +258,7 @@ const AdminUsers = () => {
       const token = localStorage.getItem('authToken');
       
       const response = await axios.put(
-        `https://datahustle.onrender.com/api/users/${selectedUser._id}/toggle-status`,
+        `https://api.datahustle.shop/api/users/${selectedUser._id}/toggle-status`,
         { disableReason },
         {
           headers: {
@@ -297,7 +297,7 @@ const AdminUsers = () => {
       const token = localStorage.getItem('authToken');
 
       await axios.put(
-        `https://datahustle.onrender.com/api/users/${selectedUser._id}`,
+        `https://api.datahustle.shop/api/users/${selectedUser._id}`,
         { role: selectedRole },
         {
           headers: {
@@ -329,7 +329,7 @@ const AdminUsers = () => {
       setProcessingAction(true);
       const token = localStorage.getItem('authToken');
       
-      await axios.delete(`https://datahustle.onrender.com/api/users/${selectedUser._id}`, {
+      await axios.delete(`https://api.datahustle.shop/api/users/${selectedUser._id}`, {
         headers: {
           'x-auth-token': token
         }

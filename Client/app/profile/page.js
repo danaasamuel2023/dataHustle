@@ -81,7 +81,7 @@ const UserStatsPage = () => {
     try {
       const userId = userData.id;
       
-      const response = await fetch(`https://datahustle.onrender.com/api/v1/user-stats/${userId}`, {
+      const response = await fetch(`https://api.datahustle.shop/api/v1/user-stats/${userId}`, {
         headers: {
           'Authorization': `Bearer ${authToken}`
         }

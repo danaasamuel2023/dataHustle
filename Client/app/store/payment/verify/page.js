@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { CheckCircle, XCircle, Clock, Loader2, RefreshCw, Copy, Phone, Database, ShoppingBag } from 'lucide-react';
 
-const API_BASE = 'https://datahustle.onrender.com/api/v1';
+const API_BASE = 'https://api.datahustle.shop/api/v1';
 
 function StoreVerifyClient() {
   const [status, setStatus] = useState('verifying');

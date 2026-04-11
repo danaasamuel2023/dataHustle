@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useTheme } from 'next-themes'
 
-const API = 'https://datahustle.onrender.com/api/support'
+const API = 'https://api.datahustle.shop/api/support'
 
 export default function DepositResolvePage() {
   const { resolvedTheme } = useTheme()
@@ -307,7 +307,7 @@ function MomoCreditForm({ dark, amount, reference, notes, setNotes, crediting, o
   const [searchEmail, setSearchEmail] = useState('')
   const [foundUser, setFoundUser] = useState(null)
   const [searching, setSearching] = useState(false)
-  const API_BASE = 'https://datahustle.onrender.com/api/support'
+  const API_BASE = 'https://api.datahustle.shop/api/support'
 
   const searchUser = async () => {
     if (!searchEmail.trim()) return
